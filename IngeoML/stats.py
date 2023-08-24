@@ -1,15 +1,46 @@
+# Copyright 2023 Mario Graff Guerrero
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+#     http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 from sklearn.metrics import f1_score
 from typing import Callable
 import numpy as np
 
 
 class BootstrapSample(object):
-    def __init__(self, N: int, num_samples: int=500):
+    """Create the bootstrap sample
+
+    :param N: Number samples
+    :type N: int
+    :param num_samples: Number of bootstrap samples, default=500
+    :type num_samples: int
+
+    >>> from IngeoML.stats import BootstrapSample
+    >>> b_sample = BootstrapSample(3, num_samples=50)
+    >>> b_sample.sample[:5]
+    array([[0, 2, 2],
+           [2, 2, 1],
+           [1, 0, 0],
+           [1, 2, 1],
+           [1, 2, 1]])    
+    """
+    def __init__(self, N: int,
+                 num_samples: int=500):
         self.N = N
         self.num_samples = num_samples
 
     @property
     def N(self):
+        """Number of samples"""
         return self._N 
     
     @N.setter
@@ -18,6 +49,7 @@ class BootstrapSample(object):
 
     @property
     def num_samples(self):
+        """Number fo bootstrap samples"""
         return self._num_samples
     
     @num_samples.setter
@@ -26,6 +58,7 @@ class BootstrapSample(object):
 
     @property
     def samples(self):
+        """Samples"""
         try:
             return self._samples
         except AttributeError:
@@ -35,6 +68,11 @@ class BootstrapSample(object):
         
 
 class CI(object):
+    """Confidence Intervals
+    
+    :param populations: 
+    :type populations: dict
+    """
     def __init__(self, populations: dict={}, 
                  statistic: Callable[[np.ndarray], float]=np.mean,
                  alpha: float=0.05,
