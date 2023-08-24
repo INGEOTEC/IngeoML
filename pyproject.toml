@@ -1,0 +1,10 @@
+[project]
+name = 'IngeoML'
+dependencies = [
+    'numpy',
+    'scikit-learn',
+]
+dynamic = ['version']
+
+[tool.setuptools.dynamic]
+version = {attr = 'IngeoML.__version__'}
