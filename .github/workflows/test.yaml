@@ -40,11 +40,11 @@ jobs:
         which python
         python --version
         which coverage
-        nosetests --verbose --with-coverage --cover-package=IngeoDash IngeoDash/tests
+        nosetests --verbose --with-coverage --cover-package=IngeoML IngeoML/tests
     - name: Tests on macOS and Windows
       if: ${{ runner.os != 'Linux' }}
       run: |
-        nosetests --verbose IngeoDash/tests
+        nosetests --verbose IngeoML/tests
     - name: coveralls
       if: ${{ runner.os == 'Linux' }}
       env:
