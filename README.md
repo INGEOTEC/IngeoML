@@ -1,2 +1,0 @@
-# IngeoML
-Machine Learning Tools
