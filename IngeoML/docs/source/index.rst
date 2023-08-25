@@ -4,10 +4,10 @@
 IngeoML
 ====================================
 
-API
+Bootstrap
 ====================================
 
 .. toctree::
    :maxdepth: 1
 
-   stats_api
+   bootstrap

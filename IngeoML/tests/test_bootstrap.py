@@ -1,0 +1,76 @@
+# Copyright 2023 Mario Graff Guerrero
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+#     http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+from IngeoML.bootstrap import StatisticSamples
+import numpy as np
+
+
+def problem_algorithms():
+    labels = [0, 0, 0, 0, 0,
+              1, 1, 1, 1, 1]
+    a = [0, 0, 0, 0, 0,
+         1, 1, 1, 1, 0]
+    b = [0, 0, 1, 0, 0,
+         1, 1, 1, 1, 0]
+    c = [0, 0, 0, 1, 0,
+         1, 1, 0, 1, 0]
+    return (np.array(labels),
+            dict(a=np.array(a),
+                 b=np.array(b),
+                 c=np.array(c)))
+
+
+def test_BootstrapSample():
+    statistic = StatisticSamples(num_samples=26)
+    samples = statistic(np.array([3, 4, 5, 2, 4]))
+    assert samples.shape[0] == 26
+
+
+# def test_CI():
+#     labels, algs = problem_algorithms()
+#     ci = CI(populations=algs)
+#     a = ci.confidence_interval('a')
+#     assert len(a) == 2 and a[0] > 0 and a[1] < 0.8
+
+
+# def test_Difference_ci():
+#     labels, algs = problem_algorithms()
+#     diff = Difference(labels, algs)
+#     a = diff.confidence_interval('a')
+#     assert a[0] > 0.6 and a[1] <= 1.0
+
+
+# def test_Difference_best():
+#     labels, algs = problem_algorithms()
+#     diff = Difference(labels, algs)
+#     assert diff.best == 'a'
+
+
+# def test_Difference_delta():
+#     labels, algs = problem_algorithms()
+#     diff = Difference(labels, algs)
+#     assert diff.delta('b') > 0 and diff.delta('c') > 0
+
+
+# def test_Difference():
+#     labels, algs = problem_algorithms()
+#     diff = Difference(labels, algs)
+#     assert diff.best == 'a'
+#     assert diff.pvalue('b') > diff.pvalue('c')
+
+
+# def test_Difference_sort():
+#     labels, algs = problem_algorithms()
+#     diff = Difference(labels, algs)
+#     for x, r in zip(diff.sort(), ['b', 'c']):
+#         assert x == r
