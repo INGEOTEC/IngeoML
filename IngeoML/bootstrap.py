@@ -33,9 +33,9 @@ class StatisticSamples(object):
     array([2.8, 3.6, 3.6, 3.6, 2.6, 4. , 2.8, 3. , 3.8, 3.6])
     >>> labels = np.r_[[0, 0, 0, 0, 0, 1, 1, 1, 1, 1]]
     >>> pred   = np.r_[[0, 0, 1, 0, 0, 1, 1, 1, 0, 1]]
-    >>> acc = StatisticSamples(num_samples=10, statistic=accuracy_score)
+    >>> acc = StatisticSamples(num_samples=15, statistic=accuracy_score)
     >>> acc(labels, pred)
-    array([0.5, 0.6, 0.8, 0.7, 0.9, 0.5, 0.7, 0.8, 0.8, 0.7])
+    array([0.9, 0.8, 0.7, 1. , 0.6, 1. , 0.7, 0.9, 0.9, 0.8, 0.9, 0.8, 0.8, 0.8, 0.8])
     """
 
     def __init__(self,
