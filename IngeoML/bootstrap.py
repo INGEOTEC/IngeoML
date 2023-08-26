@@ -95,7 +95,7 @@ class StatisticSamples(object):
         
 
 class CI(StatisticSamples):
-    """Confidence Interval
+    """Compute the Confidence Interval of a statistic using bootstrap
     
     :param alpha: 
     :type alpha: float
@@ -105,7 +105,7 @@ class CI(StatisticSamples):
     >>> import numpy as np    
     >>> labels = np.r_[[0, 0, 0, 0, 0, 1, 1, 1, 1, 1]]
     >>> pred   = np.r_[[0, 0, 1, 0, 0, 1, 1, 1, 0, 1]]
-    >>> acc = CI(num_samples=15, statistic=accuracy_score)
+    >>> acc = CI(statistic=accuracy_score)
     >>> acc(labels, pred)
     (0.7, 1.0)
     """

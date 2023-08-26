@@ -32,14 +32,14 @@ def problem_algorithms():
 
 def test_BootstrapSample():
      statistic = StatisticSamples(num_samples=26)
-     samples = statistic(np.r_([3, 4, 5, 2, 4]))
+     samples = statistic(np.r_[[3, 4, 5, 2, 4]])
      assert samples.shape[0] == 26
 
 
 def test_CI():
      statistic = CI()
      ci = statistic(np.r_[[3, 4, 5, 2, 4]])
-     assert ci.shape[0] == 2
+     assert len(ci) == 2
 
 
 # def test_Difference_ci():
