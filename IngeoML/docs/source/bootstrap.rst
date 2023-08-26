@@ -46,3 +46,6 @@ If you find this model useful for any academic/scientific purpose, we would appr
 
 .. autoclass:: IngeoML.bootstrap.StatisticSamples
    :members:
+
+.. autoclass:: IngeoML.bootstrap.CI
+   :members:
