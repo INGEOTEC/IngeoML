@@ -94,75 +94,40 @@ class StatisticSamples(object):
         return np.array(B)
         
 
-# class CI(object):
-#     """Confidence Intervals
+class CI(StatisticSamples):
+    """Compute the Confidence Interval of a statistic using bootstrap
     
-#     :param populations: 
-#     :type populations: dict
-#     """
-#     def __init__(self, populations: dict={}, 
-#                  statistic: Callable[[np.ndarray], float]=np.mean,
-#                  alpha: float=0.05,
-#                  num_samples: int=500) -> None:
-#         self.populations = populations
-#         for i in populations.values():
-#             dim = i.shape[0]
-#             break
-#         self._bootstrap = BootstrapSample(dim,
-#                                           num_samples=num_samples)
-#         self.statistic = statistic
-#         self.alpha = alpha
+    :param alpha: 
+    :type alpha: float
 
-#     @property
-#     def bootstrap(self):
-#         return self._bootstrap.samples
+    >>> from IngeoML.bootstrap import CI
+    >>> from sklearn.metrics import accuracy_score
+    >>> import numpy as np    
+    >>> labels = np.r_[[0, 0, 0, 0, 0, 1, 1, 1, 1, 1]]
+    >>> pred   = np.r_[[0, 0, 1, 0, 0, 1, 1, 1, 0, 1]]
+    >>> acc = CI(statistic=accuracy_score)
+    >>> acc(labels, pred)
+    (0.7, 1.0)
+    """
+    def __init__(self, alpha: float=0.05,
+                 **kwargs):
+        super().__init__(**kwargs)
+        self.alpha = alpha
 
-#     @property
-#     def alpha(self):
-#         return self._alpha
+    @property
+    def alpha(self):
+        """alpha"""
+        return self._alpha
     
-#     @alpha.setter
-#     def alpha(self, value):
-#         self._alpha = value
+    @alpha.setter
+    def alpha(self, value):
+        self._alpha = value / 2
 
-#     @property
-#     def statistic(self):
-#         return self._statistic
-    
-#     @statistic.setter
-#     def statistic(self, value):
-#         self._statistic = value
-
-#     @property
-#     def populations(self):
-#         return self._pops
-    
-#     @property
-#     def statistic_samples(self):
-#         try:
-#             return self._stat_samples
-#         except AttributeError:
-#             self._stat_samples = dict()
-#             return self._stat_samples
-
-#     @populations.setter
-#     def populations(self, value):
-#         self._pops = value
-
-#     def samples(self, key):
-#         if key in self.statistic_samples:
-#             return self.statistic_samples[key]
-#         data = self.populations[key]
-#         output = np.array([self.statistic(data[s])
-#                            for s in self.bootstrap])
-#         self.statistic_samples[key] = output
-#         return output
-
-#     def confidence_interval(self, key):
-#         B = self.samples(key)
-#         alpha = self.alpha
-#         return (np.percentile(B, alpha * 100), 
-#                 np.percentile(B, (1 - alpha) * 100))
+    def __call__(self, *args: np.ndarray) -> np.ndarray:
+        B =  super().__call__(*args)
+        alpha  = self.alpha  
+        return (np.percentile(B, alpha * 100), 
+                np.percentile(B, (1 - alpha) * 100))
 
 
 # class Difference(CI):

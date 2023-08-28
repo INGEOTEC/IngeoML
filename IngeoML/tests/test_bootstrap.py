@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from IngeoML.bootstrap import StatisticSamples
+from IngeoML.bootstrap import StatisticSamples, CI
 import numpy as np
 
 
@@ -31,16 +31,15 @@ def problem_algorithms():
 
 
 def test_BootstrapSample():
-    statistic = StatisticSamples(num_samples=26)
-    samples = statistic(np.array([3, 4, 5, 2, 4]))
-    assert samples.shape[0] == 26
+     statistic = StatisticSamples(num_samples=26)
+     samples = statistic(np.r_[[3, 4, 5, 2, 4]])
+     assert samples.shape[0] == 26
 
 
-# def test_CI():
-#     labels, algs = problem_algorithms()
-#     ci = CI(populations=algs)
-#     a = ci.confidence_interval('a')
-#     assert len(a) == 2 and a[0] > 0 and a[1] < 0.8
+def test_CI():
+     statistic = CI()
+     ci = statistic(np.r_[[3, 4, 5, 2, 4]])
+     assert len(ci) == 2
 
 
 # def test_Difference_ci():
