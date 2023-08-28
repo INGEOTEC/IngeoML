@@ -11,7 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from IngeoML.bootstrap import StatisticSamples, CI
+from IngeoML.bootstrap import StatisticSamples, CI, SE
+from sklearn.metrics import accuracy_score
 import numpy as np
 
 
@@ -40,6 +41,15 @@ def test_CI():
      statistic = CI()
      ci = statistic(np.r_[[3, 4, 5, 2, 4]])
      assert len(ci) == 2
+
+
+def test_se():
+     labels = np.r_[[0, 0, 0, 0, 0, 1, 1, 1, 1, 1]]
+     pred   = np.r_[[0, 0, 1, 0, 0, 1, 1, 1, 0, 1]]
+     se = SE(statistic=accuracy_score)
+     res = se(labels, pred)
+     assert res > 0 and isinstance(res, float)
+
 
 
 # def test_Difference_ci():
