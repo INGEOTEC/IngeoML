@@ -19,9 +19,9 @@ import numpy as np
 class StatisticSamples(object):
     """Apply the statistic to `num_samples` samples taken with replacement from the population (arguments).
 
-    :param statistic: Statistic
+    :param statistic: Statistic.
     :type statistic: Callable
-    :param num_samples: Number of bootstrap samples, default=500
+    :param num_samples: Number of bootstrap samples, default=500.
     :type num_samples: int
 
     >>> from IngeoML.bootstrap import StatisticSamples
@@ -46,7 +46,7 @@ class StatisticSamples(object):
 
     @property
     def statistic(self):
-        """Statistic"""
+        """Statistic function."""
         return self._statistic
     
     @statistic.setter
@@ -55,17 +55,27 @@ class StatisticSamples(object):
 
     @property
     def num_samples(self):
-        """Number of bootstrap samples"""
+        """Number of bootstrap samples."""
         return self._num_samples
     
     @num_samples.setter
     def num_samples(self, value):
         self._num_samples = value
 
+    @property
+    def statistic_samples(self):
+        """It contains the statistic samples of the latest call."""
+        assert hasattr(self, '_statistic_samples')
+        return self._statistic_samples
+    
+    @statistic_samples.setter
+    def statistic_samples(self, value):
+        self._statistic_samples = value
+
     def samples(self, N):
-        """Samples
+        """Samples.
         
-        :param N: Population size
+        :param N: Population size.
         :type N: int
         """
         def inner(N):
@@ -91,13 +101,14 @@ class StatisticSamples(object):
         for s in self.samples(args[0].shape[0]):
             _ = [arg[s] for arg in args]
             B.append(statistic(*_))
-        return np.array(B)
+        self.statistic_samples = np.array(B)
+        return self.statistic_samples
         
 
 class CI(StatisticSamples):
-    """Compute the Confidence Interval of a statistic using bootstrap
+    """Compute the Confidence Interval of a statistic using bootstrap.
     
-    :param alpha: 
+    :param alpha: :math:`[\\frac{\\alpha}{2}, 1 - \\frac{\\alpha}{2}]`. 
     :type alpha: float
 
     >>> from IngeoML.bootstrap import CI
@@ -116,7 +127,8 @@ class CI(StatisticSamples):
 
     @property
     def alpha(self):
-        """alpha"""
+        """The interval is computed for :math:`[\\frac{\\alpha}{2}, 1 - \\frac{\\alpha}{2}]`.
+        """
         return self._alpha
     
     @alpha.setter
@@ -128,6 +140,24 @@ class CI(StatisticSamples):
         alpha  = self.alpha  
         return (np.percentile(B, alpha * 100), 
                 np.percentile(B, (1 - alpha) * 100))
+    
+
+class SE(StatisticSamples):
+    """Compute the Standard Error of a statistic using bootstrap.
+
+    >>> from IngeoML.bootstrap import SE
+    >>> from sklearn.metrics import accuracy_score
+    >>> import numpy as np    
+    >>> labels = np.r_[[0, 0, 0, 0, 0, 1, 1, 1, 1, 1]]
+    >>> pred   = np.r_[[0, 0, 1, 0, 0, 1, 1, 1, 0, 1]]
+    >>> se = SE(statistic=accuracy_score)
+    >>> se(labels, pred)
+    0.11949493713124419
+    """
+
+    def __call__(self, *args: np.ndarray) -> float:
+        B =  super().__call__(*args)
+        return np.std(B)
 
 
 # class Difference(CI):
