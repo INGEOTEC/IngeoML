@@ -138,8 +138,8 @@ class CI(StatisticSamples):
     def __call__(self, *args: np.ndarray) -> np.ndarray:
         B =  super().__call__(*args)
         alpha  = self.alpha  
-        return (np.percentile(B, alpha * 100), 
-                np.percentile(B, (1 - alpha) * 100))
+        return (np.percentile(B, alpha * 100, axis=0), 
+                np.percentile(B, (1 - alpha) * 100, axis=0))
     
 
 class SE(StatisticSamples):
@@ -157,7 +157,7 @@ class SE(StatisticSamples):
 
     def __call__(self, *args: np.ndarray) -> float:
         B =  super().__call__(*args)
-        return np.std(B)
+        return np.std(B, axis=0)
 
 
 # class Difference(CI):

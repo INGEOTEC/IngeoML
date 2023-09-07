@@ -23,13 +23,24 @@ class SelectFromModelCV(SelectFromModel):
                  max_features: Union[Callable[..., Any], int, None] = None, importance_getter: Union[str, Callable[..., Any]] = 'auto',
                  min_features_to_select: int = 2,
                  cv=None,
-                 scoring=None) -> None:
+                 scoring=None,
+                 max_iter: int=10) -> None:
         super().__init__(estimator, threshold=-np.inf, 
                          prefit=prefit, norm_order=norm_order, max_features=max_features, 
                          importance_getter=importance_getter)
         self.min_features_to_select = min_features_to_select
         self.scoring = scoring
         self.cv = cv
+        self.max_iter = max_iter
+
+    @property
+    def max_iter(self):
+        """Number of points to sample between 2 and :py:attr:`max_features`"""
+        return self._max_iter
+    
+    @max_iter.setter
+    def max_iter(self, value):
+        self._max_iter = value
 
     def fit(self, X, y, groups=None):
         """Choose the number of features"""
@@ -39,7 +50,7 @@ class SelectFromModelCV(SelectFromModel):
             max_features = self.max_features
         else:
             max_features = X.shape[1] - 2
-        max_split = min(10, X.shape[1] - 2, max_features)
+        max_split = min(self.max_iter, X.shape[1] - 2, max_features)
         dims = np.linspace(2, X.shape[1] - 1, max_split).astype(int)
         folds = [(tr, vs) 
                  for tr, vs in cv.split(X, y, groups=groups)]
