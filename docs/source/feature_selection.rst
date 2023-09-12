@@ -1,7 +1,7 @@
-.. _IngeoML:
+.. _feature_selection:
 
 ====================================
-IngeoML
+Feature Selection
 ====================================
 .. image:: https://github.com/INGEOTEC/IngeoML/actions/workflows/test.yaml/badge.svg
 		:target: https://github.com/INGEOTEC/IngeoML/actions/workflows/test.yaml
@@ -15,7 +15,9 @@ IngeoML
 .. image:: https://readthedocs.org/projects/ingeoml/badge/?version=latest
     :target: https://ingeoml.readthedocs.io/en/latest/?badge=latest
 
-.. toctree::
-   :maxdepth: 1
 
-   bootstrap
+:py:class:`IngeoML.feature_selection` API
+--------------------------------------------
+
+.. autoclass:: IngeoML.feature_selection.SelectFromModelCV
+   :members: fit, max_iter, cv, scoring, min_features_to_select

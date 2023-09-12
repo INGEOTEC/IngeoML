@@ -1,14 +1,38 @@
 from typing import Any, Callable, Union
+from numbers import Integral
 from sklearn.feature_selection import SelectFromModel
 from sklearn.utils._param_validation import Interval
 from sklearn.base import is_classifier, clone
 from sklearn.model_selection import check_cv
 from sklearn.metrics import check_scoring
-from numbers import Integral
 import numpy as np
 
 
 class SelectFromModelCV(SelectFromModel):
+    """
+
+    >>> from IngeoML import SelectFromModelCV
+    >>> from sklearn.svm import LinearSVC
+    >>> from sklearn.datasets import load_wine
+    >>> from sklearn.metrics import f1_score
+    >>> import pandas as pd
+    >>> import seaborn as sns
+    >>> X, y = load_wine(return_X_y=True)
+    >>> scoring = lambda y, hy: f1_score(y, hy, average='macro')
+    >>> select = SelectFromModelCV(estimator=LinearSVC(dual='auto'),
+                                   scoring=scoring,
+                                   prefit=False).fit(X, y)
+                                   
+    The performance of the selection mechanisim can be seen in the following figure
+
+    >>> perf = select.cv_results_
+    >>> _ = [{'d': k, 'macro-f1': v} for k, v in perf.items()]
+    >>> df = pd.DataFrame(_)
+    >>> sns.set_style('whitegrid')    
+    >>> sns.lineplot(df, x='d', y='macro-f1')
+
+    .. figure:: SelectFromModelCV.png
+    """
     _parameter_constraints: dict = {
         **SelectFromModel._parameter_constraints,
         "min_features_to_select": [Interval(Integral, 0, None, closed="neither")],
