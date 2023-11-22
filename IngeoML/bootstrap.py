@@ -11,8 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from sklearn.metrics import f1_score
-from typing import Any, Callable
+from typing import Callable
+from joblib import delayed, Parallel
 import numpy as np
 
 
@@ -23,6 +23,9 @@ class StatisticSamples(object):
     :type statistic: Callable
     :param num_samples: Number of bootstrap samples, default=500.
     :type num_samples: int
+    :param n_jobs: Number of jobs to run in parallel, default=1.
+    :type n_jobs: int
+
 
     >>> from IngeoML.bootstrap import StatisticSamples
     >>> from sklearn.metrics import accuracy_score
@@ -40,9 +43,20 @@ class StatisticSamples(object):
 
     def __init__(self,
                  statistic: Callable[[np.ndarray], float]=np.mean,
-                 num_samples: int=500):
+                 num_samples: int=500,
+                 n_jobs: int=1):
         self.statistic = statistic
         self.num_samples = num_samples
+        self.n_jobs = n_jobs
+        self._samples = None
+
+    @property
+    def n_jobs(self):
+        """Number of jobs to do in parallel"""
+
+    @n_jobs.setter
+    def n_jobs(self, value):
+        self._n_jobs = value
 
     @property
     def statistic(self):
@@ -89,21 +103,27 @@ class StatisticSamples(object):
                 return inner(N)
         except AttributeError:
             return inner(N)
-        
+  
     def __call__(self, *args: np.ndarray) -> np.ndarray:
         """Population where the bootstrap process will be performed. 
 
         :param *args: Population
         :type *args: np.ndarray
         """
-        B = []
-        statistic = self.statistic
-        for s in self.samples(args[0].shape[0]):
+        def inner(s):
             _ = [arg[s] for arg in args]
-            B.append(statistic(*_))
+            return self.statistic(*_)
+
+        B = []
+        # statistic = self.statistic
+        B = Parallel(n_jobs=self.n_jobs)(delayed(inner)(s)
+                                         for s in self.samples(args[0].shape[0]))
+        # for s in self.samples(args[0].shape[0]):
+        #     _ = [arg[s] for arg in args]
+        #     B.append(statistic(*_))
         self.statistic_samples = np.array(B)
         return self.statistic_samples
-        
+   
 
 class CI(StatisticSamples):
     """Compute the Confidence Interval of a statistic using bootstrap.
