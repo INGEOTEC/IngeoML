@@ -11,9 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from IngeoML.bootstrap import StatisticSamples, CI, SE
 from sklearn.metrics import accuracy_score
 import numpy as np
+from IngeoML.bootstrap import StatisticSamples, CI, SE
 
 
 def problem_algorithms():
@@ -32,7 +32,7 @@ def problem_algorithms():
 
 
 def test_BootstrapSample():
-     statistic = StatisticSamples(num_samples=26)
+     statistic = StatisticSamples(num_samples=26, n_jobs=-1)
      samples = statistic(np.r_[[3, 4, 5, 2, 4]])
      assert samples.shape[0] == 26
 
