@@ -53,6 +53,7 @@ class StatisticSamples(object):
     @property
     def n_jobs(self):
         """Number of jobs to do in parallel"""
+        return self._n_jobs
 
     @n_jobs.setter
     def n_jobs(self, value):
