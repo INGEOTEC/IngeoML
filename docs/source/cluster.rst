@@ -1,7 +1,7 @@
-.. _IngeoML:
+.. _cluster:
 
 ====================================
-IngeoML
+Cluster
 ====================================
 .. image:: https://github.com/INGEOTEC/IngeoML/actions/workflows/test.yaml/badge.svg
 		:target: https://github.com/INGEOTEC/IngeoML/actions/workflows/test.yaml
@@ -15,10 +15,9 @@ IngeoML
 .. image:: https://readthedocs.org/projects/ingeoml/badge/?version=latest
     :target: https://ingeoml.readthedocs.io/en/latest/?badge=latest
 
-.. toctree::
-   :maxdepth: 1
 
-   bootstrap
-   feature_selection
-   cluster
-   utils
+:py:class:`IngeoML.cluster` API
+--------------------------------------------
+
+.. automodule:: IngeoML.cluster
+    :members: farthest_first_traversal
