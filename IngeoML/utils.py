@@ -81,7 +81,9 @@ class Batches:
                                       columns=columns))
         output = np.concatenate(output, axis=1)
         if self.shuffle:
-            return check_random_state(self.random_state).permutation(output, axis=1)
+            _ = [check_random_state(self.random_state).permutation(a)
+                 for a in output]
+            return np.vstack(_)
         return output
 
     def _split_dataset(self, num_elements: int):

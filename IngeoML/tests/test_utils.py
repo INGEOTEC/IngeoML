@@ -41,3 +41,6 @@ def test_stratified():
     batch = Batches(size=5, shuffle=False)
     output = batch.split(y=y)
     assert np.all(output[:, -1] == 10)
+    batch.shuffle =True
+    output2 = batch.split(y=y)
+    
