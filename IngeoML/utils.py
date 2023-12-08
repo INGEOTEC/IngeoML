@@ -94,6 +94,8 @@ class Batches:
         labels = np.unique(y)
         rows = np.ceil(y.shape[0] / self.size).astype(int)
         index = np.arange(y.shape[0])
+        if self.shuffle:
+            check_random_state(self.random_state).shuffle(index)        
         output = []
         for label, columns in zip(labels, dist):
             mask = y == label
