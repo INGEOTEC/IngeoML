@@ -79,8 +79,8 @@ class Batches:
 
     def _split_stratified(self, y: np.ndarray):
         dist = self.distribution(y, size=self.size)
-        labels, cnt = np.unique(y, return_counts=True)
-        rows = np.ceil(cnt.max() / dist.max()).astype(int)
+        labels = np.unique(y)
+        rows = np.ceil(y.shape[0] / self.size).astype(int)
         index = np.arange(y.shape[0])
         output = []
         for label, columns in zip(labels, dist):
@@ -130,6 +130,9 @@ class Batches:
             frst = index[:num_elements]
             rest = index[num_elements:].copy()
             check_random_state(self.random_state).shuffle(rest)
+        elif index.shape[0] > num_elements:
+            frst = index[:num_elements]
+            rest = None
         else:
             frst = index
             rest = None
@@ -137,7 +140,6 @@ class Batches:
             frst = np.concatenate((frst, rest))[:num_elements]
         frst.shape = (rows, columns)
         return frst
-
 
     @staticmethod
     def distribution(y: np.ndarray, size: int=64):

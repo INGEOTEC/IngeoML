@@ -21,3 +21,6 @@ Utils
 
 .. autoclass:: IngeoML.utils.Batches
     :members: split
+
+.. automodule:: IngeoML.utils
+    :members: balance_class_weigths
