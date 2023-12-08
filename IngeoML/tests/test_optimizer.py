@@ -60,8 +60,8 @@ def test_classifier():
 
     X, y = load_iris(return_X_y=True)
     m = LinearSVC(dual='auto').fit(X, y)
-    parameters = dict(W=m.coef_.T,
-                      W0=m.intercept_)
+    parameters = dict(W=jnp.array(m.coef_.T),
+                      W0=jnp.array(m.intercept_))
     p = classifier(parameters, modelo, X, y)
     assert np.fabs(p['W'] - parameters['W']).sum() > 0
     diff = p['W0'] - parameters['W0']

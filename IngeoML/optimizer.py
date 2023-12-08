@@ -49,20 +49,21 @@ def adam(parameters, batches, objective,
     return parameters
 
 
-def classifier(parameters, model, X, y, batch_size: int=64,
+def classifier(parameters, model, X, y,
+               batch_size: int=64, array=jnp.array,
                **kwargs):
     """Classifier optimized with optax"""
 
     @jax.jit
     def media_entropia_cruzada(params, X, y):
         hy = model(params, X)
-        hy = jax.nn.softmax(jnp.array(hy), axis=0)
+        hy = jax.nn.softmax(hy, axis=0)
         return - ((y * jnp.log(hy)).sum(axis=1) * pesos).sum()
 
     encoder = OneHotEncoder(sparse_output=False).fit(y.reshape(-1, 1))
     y_enc = encoder.transform(y.reshape(-1, 1))
     batches = Batches(size=batch_size)
-    batches = [(jnp.array(X[idx]), jnp.array(y_enc[idx]))
+    batches = [(array(X[idx]), array(y_enc[idx]))
                for idx in batches.split(y=y)]
     pesos = jnp.ones(batches[0][0].shape[0])
     return adam(parameters, batches, media_entropia_cruzada, **kwargs)
