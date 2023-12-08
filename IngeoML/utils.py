@@ -14,6 +14,18 @@
 
 import numpy as np
 from sklearn.utils import check_random_state
+try:
+    USE_TQDM = True
+    from tqdm import tqdm
+except ImportError:
+    USE_TQDM = False
+
+
+def progress_bar(arg, **kwargs):
+    """Progress bar using tqdm"""
+    if USE_TQDM:
+        return tqdm(arg, **kwargs)
+    return arg
 
 
 class Batches:
