@@ -15,8 +15,7 @@ from sklearn.preprocessing import OneHotEncoder
 import jax
 import jax.numpy as jnp
 import optax
-from IngeoML.utils import Batches
-
+from IngeoML.utils import Batches, balance_class_weigths
 
 
 def adam(parameters, batches, objective, 
@@ -51,6 +50,7 @@ def adam(parameters, batches, objective,
 
 def classifier(parameters, model, X, y,
                batch_size: int=64, array=jnp.array,
+               class_weight: str='balanced',
                **kwargs):
     """Classifier optimized with optax"""
 
@@ -65,5 +65,8 @@ def classifier(parameters, model, X, y,
     batches = Batches(size=batch_size)
     batches = [(array(X[idx]), array(y_enc[idx]))
                for idx in batches.split(y=y)]
-    pesos = jnp.ones(batches[0][0].shape[0])
+    if class_weight == 'balanced':
+        pesos = jnp.array(balance_class_weigths(batches[0][1].argmax(axis=1)))
+    else:
+        pesos = jnp.ones(batches[0][0].shape[0])
     return adam(parameters, batches, media_entropia_cruzada, **kwargs)
