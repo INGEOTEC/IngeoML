@@ -45,8 +45,8 @@ def test_CI():
 
 def test_CI2D():
      from sklearn.metrics import f1_score
-     labels = np.r_[[0, 0, 0, 0, 0, 1, 1, 1, 1, 1]]
-     pred   = np.r_[[0, 0, 1, 0, 0, 1, 1, 1, 0, 1]]
+     labels = np.r_[[0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0]]
+     pred   = np.r_[[0, 0, 1, 0, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 0]]
      ci = CI(statistic=lambda y, hy: f1_score(y, hy, average=None))
      a = ci(labels, pred)
      assert a[0].shape[0] == 2 and a[1].shape[0] == 2

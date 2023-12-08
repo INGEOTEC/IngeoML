@@ -27,7 +27,7 @@ class StatisticSamples(object):
     :type n_jobs: int
 
 
-    >>> from IngeoML.bootstrap import StatisticSamples
+    >>> from IngeoML import StatisticSamples
     >>> from sklearn.metrics import accuracy_score
     >>> import numpy as np
     >>> statistic = StatisticSamples(num_samples=10, statistic=np.mean)
@@ -132,7 +132,7 @@ class CI(StatisticSamples):
     :param alpha: :math:`[\\frac{\\alpha}{2}, 1 - \\frac{\\alpha}{2}]`. 
     :type alpha: float
 
-    >>> from IngeoML.bootstrap import CI
+    >>> from IngeoML import CI
     >>> from sklearn.metrics import accuracy_score
     >>> import numpy as np    
     >>> labels = np.r_[[0, 0, 0, 0, 0, 1, 1, 1, 1, 1]]
@@ -166,7 +166,7 @@ class CI(StatisticSamples):
 class SE(StatisticSamples):
     """Compute the Standard Error of a statistic using bootstrap.
 
-    >>> from IngeoML.bootstrap import SE
+    >>> from IngeoML import SE
     >>> from sklearn.metrics import accuracy_score
     >>> import numpy as np    
     >>> labels = np.r_[[0, 0, 0, 0, 0, 1, 1, 1, 1, 1]]

@@ -11,7 +11,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-__version__ = '0.0.9'
+import numpy as np
+from IngeoML.cluster import farthest_first_traversal
 
-from IngeoML.bootstrap import CI, SE, StatisticSamples
-from IngeoML.feature_selection import SelectFromModelCV
+
+def test_farthest_first_traversal():
+    """Test"""
+    data = np.array([[1, 0, 0, 0],
+                     [1, 0, 1, 0],
+                     [0, 1, 0, 0]])
+    res = farthest_first_traversal(data, num=2)
+    assert res == [0, 2]

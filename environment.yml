@@ -5,3 +5,5 @@ dependencies:
   - python
   - pip
   - scikit-learn
+  - jax
+  - optax

@@ -20,6 +20,12 @@ def farthest_first_traversal(X: np.ndarray, num: int=512):
     :type X: np.ndarray
     :param num: Number of elements
     :type num: int
+
+    >>> from IngeoML.cluster import farthest_first_traversal
+    >>> import numpy as np
+    >>> data = np.array([[1, 0, 0, 0], [1, 0, 1, 0], [0, 1, 0, 0]])
+    >>> farthest_first_traversal(data, num=2)
+    [0, 2]
     """
     S = []
     siguiente = 0
