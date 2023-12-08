@@ -30,12 +30,20 @@ class Batches:
     :type shuffle: bool
     :param random_state: Random State, default=None
 
+    >>> import numpy as np
     >>> from IngeoML.utils import Batches
     >>> b = Batches(size=3)
     >>> X = np.empty((5, 4))
     >>> b.split(X)
     array([[4, 0, 2],
            [1, 3, 4]])
+    >>> y = np.r_[0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 2]
+    >>> b.split(y=y)
+    array([[ 0, 10,  5],
+           [ 1,  6, 10],
+           [ 2, 10,  7],
+           [ 3, 10,  8],
+           [10,  9,  4]])    
     """
 
     def __init__(self, size: int=64,
@@ -165,4 +173,14 @@ class Batches:
         if self.strategy == 'stratified':
             return self._split_stratified(y)
         raise NotImplementedError(f'Missing {self.strategy}')
-        
+
+
+def balance_class_weigths(labels):
+    """Weights of the labels set to balance"""
+    y_ = labels
+    labels, cnts = np.unique(y_, return_counts=True)
+    weigths = np.empty(y_.shape[0])
+    for label, cnt in zip(labels, cnts):
+        mask = y_ == label
+        weigths[mask] = 1 / (labels.shape[0] * cnt)
+    return weigths

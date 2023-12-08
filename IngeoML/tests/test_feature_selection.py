@@ -20,7 +20,7 @@ from sklearn.svm import LinearSVC
 
 def test_SelectFromModelCV():
     X, y = load_wine(return_X_y=True)
-    select = SelectFromModelCV(estimator=LinearSVC(),
+    select = SelectFromModelCV(estimator=LinearSVC(dual='auto'),
                                scoring=lambda y, hy: f1_score(y, hy, average='macro'),
                                prefit=False)
     select.fit(X, y)
@@ -33,7 +33,7 @@ def test_SelectFromModelCV():
 
 def test_SelectFromModelCV_prefit():
     X, y = load_wine(return_X_y=True)
-    select = SelectFromModelCV(estimator=LinearSVC().fit(X, y),
+    select = SelectFromModelCV(estimator=LinearSVC(dual='auto').fit(X, y),
                                scoring=lambda y, hy: f1_score(y, hy, average='macro'),
                                prefit=True)
     select.fit(X, y)

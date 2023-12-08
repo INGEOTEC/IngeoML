@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import numpy as np
-from IngeoML.utils import Batches
+from IngeoML.utils import Batches, balance_class_weigths
 
 
 def test_batches():
@@ -42,5 +42,12 @@ def test_stratified():
     output = batch.split(y=y)
     assert np.all(output[:, -1] == 10)
     batch.shuffle =True
-    output2 = batch.split(y=y)
+    batch.split(y=y)
     
+
+def test_balance_class_weigths():
+    """Weights to have a balance in the labels"""
+    y = np.r_[0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 2]
+    w = balance_class_weigths(y)
+    assert w.sum() == 1
+    assert w.shape[0] == y.shape[0]
