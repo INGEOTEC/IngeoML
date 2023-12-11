@@ -28,7 +28,7 @@ def test_adam():
         return Y
     
     @jax.jit
-    def media_entropia_cruzada(params, X, y):
+    def media_entropia_cruzada(params, X, y, pesos):
         hy = modelo(params, X)
         hy = jax.nn.softmax(jnp.array(hy), axis=0)
         return - ((y * jnp.log(hy)).sum(axis=1) * pesos).sum()    
@@ -41,9 +41,11 @@ def test_adam():
     batches = Batches()
     a = jnp.array
     y_enc = encoder.transform(y.reshape(-1, 1))
-    batches = [(a(X[idx]), a(y_enc[idx]))
+    batches = [[a(X[idx]), a(y_enc[idx])]
                for idx in batches.split(y=y)]
     pesos = jnp.ones(batches[0][0].shape[0])
+    for b in batches:
+        b.append(pesos)
     p = adam(parameters, batches, media_entropia_cruzada)
     assert np.fabs(p['W'] - parameters['W']).sum() > 0
     fit1 = media_entropia_cruzada(parameters, *batches[0])

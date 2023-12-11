@@ -51,3 +51,21 @@ def test_balance_class_weigths():
     w = balance_class_weigths(y)
     assert w.sum() == 1
     assert w.shape[0] == y.shape[0]
+
+
+def test_batches_nofill():
+    """Test stratified no fill"""
+
+    batches = Batches(size=4,
+                      shuffle=False,
+                      remainder='drop')
+    y = np.r_[0, 0, 0, 0, 0, 0,
+              1, 1, 1, 1, 1, 2]
+    res = batches.split(y=y)
+    assert res.shape[0] == 1
+    y = np.r_[0, 0, 0, 0, 0, 0,
+              1, 1, 1, 1, 1]
+    res = batches.split(y=y)    
+    _, b = np.unique(res, return_counts=True)
+    assert np.all(b <= 1)
+    assert res.shape[0] == 2

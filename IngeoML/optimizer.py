@@ -25,7 +25,7 @@ def adam(parameters, batches, objective,
          epochs: int=5, learning_rate: float=1e-2, 
          every_k_schedule: int=None,
          **kwargs):
-    """adam optimizer """
+    """adam optimizer"""
 
     @jax.jit
     def update_finite(a, b):
@@ -33,8 +33,8 @@ def adam(parameters, batches, objective,
         return jnp.where(m, b, a)
 
     @jax.jit
-    def evaluacion(parameters, estado, X, y):
-        grads = objective_grad(parameters, X, y)
+    def evaluacion(parameters, estado, X, y, weigths):
+        grads = objective_grad(parameters, X, y, weigths)
         updates, estado = optimizador.update(grads, estado, parameters)
         parameters = optax.apply_updates(parameters, updates)
         return parameters, estado
@@ -45,8 +45,9 @@ def adam(parameters, batches, objective,
     estado = optimizador.init(parameters)
     objective_grad  = jax.grad(objective)
     total = epochs * len(batches)
-    for _, (X, y) in progress_bar(product(range(epochs), batches), total=total):
-        p, estado = evaluacion(parameters, estado, X, y)
+    for _, (X, y, weigths) in progress_bar(product(range(epochs),
+                                                   batches), total=total):
+        p, estado = evaluacion(parameters, estado, X, y, weigths)
         parameters = jax.tree_map(update_finite, parameters, p)
     return parameters
 
@@ -58,10 +59,10 @@ def classifier(parameters, model, X, y,
     """Classifier optimized with optax"""
 
     @jax.jit
-    def media_entropia_cruzada(params, X, y):
+    def suma_entropia_cruzada(params, X, y, weigths):
         hy = model(params, X)
         hy = jax.nn.softmax(hy, axis=0)
-        return - ((y * jnp.log(hy)).sum(axis=1) * pesos).sum()
+        return - ((y * jnp.log(hy)).sum(axis=1) * weigths).sum()
 
     @jax.jit
     def entropia_cruzada(y, hy):
@@ -69,13 +70,13 @@ def classifier(parameters, model, X, y,
         return lax.cond(_ == -jnp.inf, lambda w: jnp.log(1e-6), lambda w: w, _)
 
     @jax.jit
-    def media_entropia_cruzada_binaria(params, X, y):
+    def media_entropia_cruzada_binaria(params, X, y, weigths):
         hy = model(params, X)
         hy = 1 / (1 + jnp.exp(-hy))
         hy = hy.flatten()
         return - lax.fori_loop(0, y.shape[0],
-                            lambda i, x: x + pesos[i] * entropia_cruzada(y[i], hy[i]),
-                            1) / y.shape[0]
+                               lambda i, x: x + weigths[i] * entropia_cruzada(y[i], hy[i]),
+                               1) / y.shape[0]
 
     batches = Batches() if batches is None else batches
     labels = np.unique(y)
@@ -85,15 +86,20 @@ def classifier(parameters, model, X, y,
     else:
         encoder = OneHotEncoder(sparse_output=False).fit(y.reshape(-1, 1))
         y_enc = encoder.transform(y.reshape(-1, 1))
-    batches = [(array(X[idx]), jnp.array(y_enc[idx]))
-               for idx in batches.split(y=y)]
-    y_ = batches[0][1]    
-    if class_weight == 'balanced':    
-        y_ = y_ if labels.shape[0] == 2 else y_.argmax(axis=1)
-        pesos = jnp.array(balance_class_weigths(y_))
+    batches_ = []
+    if class_weight == 'balanced':
+        for idx in batches.split(y=y):
+            batches_.append((array(X[idx]),
+                             jnp.array(y_enc[idx]),
+                             jnp.array(balance_class_weigths(y[idx]))))
     else:
-        pesos = jnp.ones(y_.shape[0])
+        for idx in batches.split(y=y):
+            batches_.append((array(X[idx]),
+                             jnp.array(y_enc[idx]),
+                             jnp.ones(idx.shape[0])))
+
     if labels.shape[0] == 2:
-        return adam(parameters, batches,
+        return adam(parameters, batches_,
                     media_entropia_cruzada_binaria, **kwargs)
-    return adam(parameters, batches, media_entropia_cruzada, **kwargs)
+    return adam(parameters, batches_,
+                suma_entropia_cruzada, **kwargs)
