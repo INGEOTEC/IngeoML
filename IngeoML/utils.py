@@ -91,11 +91,14 @@ class Batches:
 
     def _split_stratified(self, y: np.ndarray):
         dist = self.distribution(y, size=self.size)
-        labels = np.unique(y)
-        rows = np.ceil(y.shape[0] / self.size).astype(int)
+        labels, cnt = np.unique(y, return_counts=True)
+        if self.remainder == 'drop':
+            rows = np.ceil(cnt / dist).min().astype(int)
+        else:
+            rows = np.ceil(y.shape[0] / self.size).astype(int)
         index = np.arange(y.shape[0])
         if self.shuffle:
-            check_random_state(self.random_state).shuffle(index)        
+            check_random_state(self.random_state).shuffle(index)
         output = []
         for label, columns in zip(labels, dist):
             mask = y == label
@@ -105,7 +108,9 @@ class Batches:
         if self.shuffle:
             _ = [check_random_state(self.random_state).permutation(a)
                  for a in output]
-            return np.vstack(_)
+            output = np.vstack(_)
+        if self.remainder == 'drop' and np.any(rows * dist > cnt):
+            return output[:-1]
         return output
 
     def _split_dataset(self, num_elements: int):
@@ -119,7 +124,7 @@ class Batches:
         if index.shape[0] % self.size and not fill:
             return output[:-1]
         return output
-    
+
     def blocks(self, index: np.ndarray,
                rows: int, columns: int):
         """Create the blocks
