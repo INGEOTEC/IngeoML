@@ -69,3 +69,15 @@ def test_batches_nofill():
     _, b = np.unique(res, return_counts=True)
     assert np.all(b <= 1)
     assert res.shape[0] == 2
+
+
+def test_batches_jaccard():
+    """Test jaccard index"""
+    batches = Batches(size=4,
+                      shuffle=False)
+    y = np.r_[0, 0, 0, 0, 0, 0,
+              1, 1, 1, 1]
+    splits = batches.split(y=y)
+    res = batches.jaccard(splits)
+    assert res.shape[0] == splits.shape[0]
+    assert res[0] == 0.2

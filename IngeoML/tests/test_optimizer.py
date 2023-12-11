@@ -75,3 +75,34 @@ def test_classifier():
     p2 = classifier(parameters, modelo, X, y)
     diff = p2['W0'] - parameters['W0']
     assert np.fabs(diff).sum() > 0
+
+
+def test_classifier_early_stopping():
+    """Test early stopping"""
+
+    @jax.jit
+    def modelo(params, X):
+        Y = X @ params['W'] + params['W0']
+        return Y
+
+    X, y = load_iris(return_X_y=True)
+    m = LinearSVC(dual='auto').fit(X, y)
+    parameters = dict(W=jnp.array(m.coef_.T),
+                      W0=jnp.array(m.intercept_))
+    batches = Batches(size=45)
+    p = classifier(parameters, modelo, X, y,
+                   epochs=10,
+                   batches=batches,
+                   early_stopping=2,
+                   every_k_schedule=2,
+                   learning_rate=1e-1)
+    X, y = load_breast_cancer(return_X_y=True)
+    m = LinearSVC(dual='auto').fit(X, y)
+    parameters = dict(W=jnp.array(m.coef_.T),
+                      W0=jnp.array(m.intercept_))
+    p2 = classifier(parameters, modelo, X, y,
+                    epochs=10,
+                    batches=batches,
+                    early_stopping=2,
+                    every_k_schedule=2,
+                    learning_rate=1e-1)    

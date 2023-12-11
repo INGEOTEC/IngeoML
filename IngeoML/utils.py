@@ -194,6 +194,21 @@ class Batches:
         if self.strategy == 'stratified':
             return self._split_stratified(y)
         raise NotImplementedError(f'Missing {self.strategy}')
+    
+    @staticmethod
+    def jaccard(splits: np.ndarray) -> np.ndarray:
+        """Jaccard index between splits"""
+        num_elem = np.unique(splits).shape[0]
+        mask = np.empty(splits.shape[0], dtype=bool)
+        output = np.empty(splits.shape[0])
+        for i in range(splits.shape[0]):
+            mask.fill(True)
+            mask[i] = False
+            rest = splits[mask].flatten()
+            origin = splits[i]
+            _ = np.intersect1d(origin, rest)
+            output[i] = _.shape[0] / num_elem
+        return output
 
 
 def balance_class_weigths(labels):

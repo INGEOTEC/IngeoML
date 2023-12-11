@@ -13,6 +13,7 @@
 # limitations under the License.
 from itertools import product
 from sklearn.preprocessing import OneHotEncoder
+from sklearn.metrics import f1_score
 import numpy as np
 import jax
 import jax.numpy as jnp
@@ -24,7 +25,9 @@ from IngeoML.utils import Batches, balance_class_weigths, progress_bar
 def adam(parameters, batches, objective, 
          epochs: int=5, learning_rate: float=1e-2, 
          every_k_schedule: int=None,
-         **kwargs):
+         early_stopping: int=None,
+         validation=None, model=None,
+         validation_score=None, **kwargs):
     """adam optimizer"""
 
     @jax.jit
@@ -40,21 +43,43 @@ def adam(parameters, batches, objective,
         return parameters, estado
 
     optimizador = optax.adam(learning_rate=learning_rate, **kwargs)
+    if validation_score is None:
+        validation_score = lambda y, hy: f1_score(y, hy, average='macro')
     _ = every_k_schedule if every_k_schedule is not None else len(batches)
-    optimizador = optax.MultiSteps(optimizador, every_k_schedule=_)
+    every_k_schedule = _
+    optimizador = optax.MultiSteps(optimizador,
+                                   every_k_schedule=every_k_schedule)
     estado = optimizador.init(parameters)
     objective_grad  = jax.grad(objective)
     total = epochs * len(batches)
+    fit, best = None, None
+    i = 0        
     for _, (X, y, weigths) in progress_bar(product(range(epochs),
                                                    batches), total=total):
         p, estado = evaluacion(parameters, estado, X, y, weigths)
         parameters = jax.tree_map(update_finite, parameters, p)
+        if validation is not None and (i % every_k_schedule) == 0:
+            X, y, weigths = validation
+            hy = model(parameters, X)
+            if y.ndim == 1:
+                hy = np.where(hy.flatten() > 0, 1, 0)
+            else:
+                hy = hy.argmax(axis=1)
+                y = y.argmax(axis=1)
+            comp = validation_score(y, hy)
+            if fit is None or comp > fit[1]:
+                fit = (i, comp)
+                best = parameters
+            elif (i - fit[0]) // every_k_schedule >= early_stopping:
+                return best
+        i += 1
     return parameters
 
 
 def classifier(parameters, model, X, y,
                batches=None, array=jnp.array,
                class_weight: str='balanced',
+               early_stopping: int=None,
                **kwargs):
     """Classifier optimized with optax"""
 
@@ -78,6 +103,7 @@ def classifier(parameters, model, X, y,
                                lambda i, x: x + weigths[i] * entropia_cruzada(y[i], hy[i]),
                                1) / y.shape[0]
 
+    validation = None
     batches = Batches() if batches is None else batches
     labels = np.unique(y)
     if labels.shape[0] == 2:
@@ -88,18 +114,28 @@ def classifier(parameters, model, X, y,
         y_enc = encoder.transform(y.reshape(-1, 1))
     batches_ = []
     if class_weight == 'balanced':
-        for idx in batches.split(y=y):
+        splits = batches.split(y=y)
+        for idx in splits:
             batches_.append((array(X[idx]),
                              jnp.array(y_enc[idx]),
                              jnp.array(balance_class_weigths(y[idx]))))
     else:
-        for idx in batches.split(y=y):
+        splits = batches.split(y=y)
+        for idx in splits:
             batches_.append((array(X[idx]),
                              jnp.array(y_enc[idx]),
                              jnp.ones(idx.shape[0])))
-
+    if early_stopping is not None:
+        jaccard = batches.jaccard(splits)
+        index = jaccard.argmin()
+        validation = batches_[index]
+        del batches_[index]
     if labels.shape[0] == 2:
-        return adam(parameters, batches_,
-                    media_entropia_cruzada_binaria, **kwargs)
+        objective = media_entropia_cruzada_binaria
+    else:
+        objective = suma_entropia_cruzada
     return adam(parameters, batches_,
-                suma_entropia_cruzada, **kwargs)
+                objective,
+                early_stopping=early_stopping,
+                validation=validation, model=model,
+                **kwargs)
