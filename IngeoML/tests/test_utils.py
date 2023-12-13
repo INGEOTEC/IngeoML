@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import numpy as np
-from IngeoML.utils import Batches, balance_class_weigths
+import jax.numpy as jnp
+from IngeoML.utils import Batches, balance_class_weigths, cross_entropy, error
 
 
 def test_batches():
@@ -81,3 +82,40 @@ def test_batches_jaccard():
     res = batches.jaccard(splits)
     assert res.shape[0] == splits.shape[0]
     assert res[0] == 0.2
+
+
+def test_cross_entropy():
+    y = jnp.array([[1, 0],
+                   [1, 0],
+                   [0, 1]])
+    hy = jnp.array([[0.9, 0.1],
+                    [0.6, 0.4],
+                    [0.2, 0.8]])
+    w = jnp.array([1/3, 1/3, 1/3])
+    value = cross_entropy(y, hy, w)
+    assert value == 0.27977654
+    hy = jnp.array([[1, 0],
+                    [1, 0],
+                    [0.01, 0.99]])
+    value = cross_entropy(y, hy, w)
+    assert jnp.fabs(value - 0.00335011) < 1e-6
+    value = cross_entropy(y, y, w)
+    assert value == 0
+    y = jnp.array([1, 0, 1])
+    hy = jnp.array([0.9, 0.3, 0.8])
+    w = jnp.array([1/3, 1/3, 1/3])
+    value = cross_entropy(y, hy, w)
+    assert jnp.fabs(value - 0.3285041) < 1e-6
+
+
+def test_error():
+    y = jnp.array([[1, 0],
+                   [1, 0],
+                   [0, 1]])
+    hy = jnp.array([[0.9, 0.1],
+                    [0.6, 0.4],
+                    [0.6, 0.4]])
+    w = jnp.array([1/3, 1/3, 1/3])
+    value = error(y, hy, w)
+    # assert value is None
+    assert jnp.fabs(value - 0.33333334) < 1e-6

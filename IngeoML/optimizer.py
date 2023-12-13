@@ -19,7 +19,7 @@ import jax
 import jax.numpy as jnp
 import jax.lax as lax
 import optax
-from IngeoML.utils import Batches, balance_class_weigths, progress_bar
+from IngeoML.utils import Batches, balance_class_weigths, progress_bar, cross_entropy
 
 
 def adam(parameters, batches, objective, 
@@ -80,62 +80,66 @@ def classifier(parameters, model, X, y,
                batches=None, array=jnp.array,
                class_weight: str='balanced',
                early_stopping: int=None,
+               deviation=cross_entropy,
+               n_outputs: int=None,
                **kwargs):
     """Classifier optimized with optax"""
 
     @jax.jit
-    def suma_entropia_cruzada(params, X, y, weigths):
-        hy = model(params, X)
-        hy = jax.nn.softmax(hy, axis=0)
-        return - ((y * jnp.log(hy)).sum(axis=1) * weigths).sum()
-
-    @jax.jit
-    def entropia_cruzada(y, hy):
-        _ = lax.cond(y == 1, lambda w: jnp.log(w), lambda w: jnp.log(1 - w), hy)
-        return lax.cond(_ == -jnp.inf, lambda w: jnp.log(1e-6), lambda w: w, _)
-
-    @jax.jit
-    def media_entropia_cruzada_binaria(params, X, y, weigths):
+    def deviation_model_binary(params, X, y, weigths):
         hy = model(params, X)
         hy = 1 / (1 + jnp.exp(-hy))
         hy = hy.flatten()
-        return - lax.fori_loop(0, y.shape[0],
-                               lambda i, x: x + weigths[i] * entropia_cruzada(y[i], hy[i]),
-                               1) / y.shape[0]
+        return deviation(y, hy, weigths)
 
+    @jax.jit
+    def deviation_model(params, X, y, weigths):
+        hy = model(params, X)
+        hy = jax.nn.softmax(hy, axis=-1)
+        return deviation(y, hy, weigths)
+    
+    def encode(y, n_outputs):
+        if n_outputs == 1:
+            labels = np.unique(y)            
+            h = {v:k for k, v in enumerate(labels)}
+            y_enc = np.array([h[x] for x in y])
+        else:
+            encoder = OneHotEncoder(sparse_output=False).fit(y.reshape(-1, 1))
+            y_enc = encoder.transform(y.reshape(-1, 1))
+        return y_enc
+
+    def create_batches(batches):
+        batches = Batches() if batches is None else batches
+        batches_ = []
+        if class_weight == 'balanced':
+            splits = batches.split(y=y)
+            balance = balance_class_weigths
+        else:
+            splits = batches.split(X)
+            balance = lambda x: jnp.ones(x.shape[0]) / x.shape[0]
+
+        for idx in splits:
+            batches_.append((array(X[idx]),
+                             jnp.array(y_enc[idx]),
+                             jnp.array(balance(y[idx]))))
+        return batches_, splits
+
+    if n_outputs is None:
+        n_outputs = model(parameters, X).shape[-1]
+    y_enc = encode(y, n_outputs)
+    batches_, splits = create_batches(batches)
     validation = None
-    batches = Batches() if batches is None else batches
-    labels = np.unique(y)
-    if labels.shape[0] == 2:
-        h = {v:k for k, v in enumerate(labels)}
-        y_enc = np.array([h[x] for x in y])
-    else:
-        encoder = OneHotEncoder(sparse_output=False).fit(y.reshape(-1, 1))
-        y_enc = encoder.transform(y.reshape(-1, 1))
-    batches_ = []
-    if class_weight == 'balanced':
-        splits = batches.split(y=y)
-        for idx in splits:
-            batches_.append((array(X[idx]),
-                             jnp.array(y_enc[idx]),
-                             jnp.array(balance_class_weigths(y[idx]))))
-    else:
-        splits = batches.split(y=y)
-        for idx in splits:
-            batches_.append((array(X[idx]),
-                             jnp.array(y_enc[idx]),
-                             jnp.ones(idx.shape[0])))
     if early_stopping is not None:
-        jaccard = batches.jaccard(splits)
+        jaccard = Batches.jaccard(splits)
         index = jaccard.argmin()
         validation = batches_[index]
         del batches_[index]
-    if labels.shape[0] == 2:
-        objective = media_entropia_cruzada_binaria
+
+    if n_outputs == 1:
+        objective = deviation_model_binary
     else:
-        objective = suma_entropia_cruzada
-    return adam(parameters, batches_,
-                objective,
+        objective = deviation_model
+    return adam(parameters, batches_, objective,
                 early_stopping=early_stopping,
                 validation=validation, model=model,
                 **kwargs)

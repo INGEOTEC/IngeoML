@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import jax
+import jax.numpy as jnp
+import jax.lax as lax
 import numpy as np
 from sklearn.utils import check_random_state
 try:
@@ -220,3 +223,30 @@ def balance_class_weigths(labels):
         mask = y_ == label
         weigths[mask] = 1 / (labels.shape[0] * cnt)
     return weigths
+
+
+@jax.jit
+def cross_entropy(y, hy, weigths):
+    """Cross-entropy loss
+    
+    :param y: Gold standard
+    :param hy: Predictions
+    :param weigths: Weights for each element
+    """
+
+    values = - ((y * jnp.log(hy)).sum(axis=-1) * weigths)
+    return jnp.nansum(values)
+
+
+@jax.jit
+def error(y, hy, weigths):
+    """Error
+
+    :param y: Gold standard
+    :param hy: Predictions
+    :param weigths: Weights for each element    
+    """
+
+    res = y * hy
+    res = res.sum(axis=-1) - 1 / y.shape[1]
+    return 1 - (jax.nn.sigmoid(100 * res) * weigths).sum(axis=-1)

@@ -18,7 +18,7 @@ import numpy as np
 import jax.numpy as jnp
 import jax
 from IngeoML.optimizer import adam, classifier
-from IngeoML.utils import Batches
+from IngeoML.utils import Batches, cross_entropy, error
 
 
 def test_adam():
@@ -30,8 +30,8 @@ def test_adam():
     @jax.jit
     def media_entropia_cruzada(params, X, y, pesos):
         hy = modelo(params, X)
-        hy = jax.nn.softmax(jnp.array(hy), axis=0)
-        return - ((y * jnp.log(hy)).sum(axis=1) * pesos).sum()    
+        hy = jax.nn.softmax(jnp.array(hy), axis=1)
+        return - ((y * jnp.log(hy)).sum(axis=1) * pesos).sum()
 
     X, y = load_iris(return_X_y=True)
     m = LinearSVC(dual='auto').fit(X, y)
@@ -105,4 +105,44 @@ def test_classifier_early_stopping():
                     batches=batches,
                     early_stopping=2,
                     every_k_schedule=2,
-                    learning_rate=1e-1)    
+                    learning_rate=1e-1)
+    
+
+def test_classifier_deviation():
+    @jax.jit
+    def modelo(params, X):
+        Y = X @ params['W'] + params['W0']
+        return Y
+    
+    X, y = load_iris(return_X_y=True)
+    m = LinearSVC(dual='auto').fit(X, y)
+    parameters = dict(W=m.coef_.T,
+                      W0=m.intercept_)
+
+    p = classifier(parameters, modelo, X, y,
+                   epochs=1,
+                   every_k_schedule=1,
+                   deviation=cross_entropy)
+    
+
+def test_classifier_error():
+    @jax.jit
+    def modelo(params, X):
+        Y = X @ params['W'] + params['W0']
+        return Y
+    
+    @jax.jit
+    def deviation_model(params, X, y, weigths):
+        hy = modelo(params, X)
+        hy = jax.nn.softmax(hy, axis=-1)
+        return error(y, hy, weigths)        
+    
+    X, y = load_iris(return_X_y=True)
+    m = LinearSVC(dual='auto').fit(X, y)
+    parameters = dict(W=m.coef_.T,
+                      W0=m.intercept_)
+    # assert modelo(parameters, X).shape[-1] is None
+    p = classifier(parameters, modelo, X, y,
+                   epochs=1,
+                   every_k_schedule=1,
+                   deviation=error)
