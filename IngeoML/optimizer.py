@@ -20,13 +20,13 @@ import jax.numpy as jnp
 from jax import lax
 from jax import nn
 import optax
-from IngeoML.utils import Batches, balance_class_weigths, progress_bar, cross_entropy
+from IngeoML.utils import Batches, balance_class_weigths, progress_bar, error, error_binary
 
 
 def adam(parameters, batches, objective, 
          epochs: int=5, learning_rate: float=1e-2, 
          every_k_schedule: int=None,
-         early_stopping: int=None,
+         early_stopping: int=jnp.inf,
          validation=None, model=None,
          validation_score=None, **kwargs):
     """adam optimizer"""
@@ -43,7 +43,9 @@ def adam(parameters, batches, objective,
         parameters = optax.apply_updates(parameters, updates)
         return parameters, estado
 
-    def validation_predictions():
+    def _validation_score():
+        if validation is None:
+            return - jnp.inf
         X, y, weigths = validation
         hy = model(parameters, X)
         if y.ndim == 1:
@@ -51,39 +53,44 @@ def adam(parameters, batches, objective,
         else:
             hy = hy.argmax(axis=1)
             y = y.argmax(axis=1)
-        return y, hy
+        return validation_score(y, hy)
 
     optimizador = optax.adam(learning_rate=learning_rate, **kwargs)
     if validation_score is None:
         validation_score = lambda y, hy: f1_score(y, hy, average='macro')
-    _ = every_k_schedule if every_k_schedule is not None else len(batches)
-    every_k_schedule = _
+    total = epochs * len(batches)        
+    if every_k_schedule is None or every_k_schedule > len(batches):
+        every_k_schedule = len(batches)
+    every_k_schedule = [x for x in range(every_k_schedule, len(batches) + 1)
+                        if (total % x) == 0][0]
     optimizador = optax.MultiSteps(optimizador,
                                    every_k_schedule=every_k_schedule)
     estado = optimizador.init(parameters)
     objective_grad  = jax.grad(objective)
-    total = epochs * len(batches)
-    fit = None
-    i = 0        
+    fit = (1, _validation_score(), parameters)
+    i = 1
+    early_stopping = early_stopping * every_k_schedule
     for _, (X, y, weigths) in progress_bar(product(range(epochs),
                                                    batches), total=total):
         p, estado = evaluacion(parameters, estado, X, y, weigths)
         parameters = jax.tree_map(update_finite, parameters, p)
-        if validation is not None and (i % every_k_schedule) == 0:
-            comp = validation_score(*validation_predictions())
-            if fit is None or comp > fit[1]:
+        if (i % every_k_schedule) == 0:
+            comp = _validation_score()
+            if comp > fit[1]:
                 fit = (i, comp, parameters)
-            elif (i - fit[0]) // every_k_schedule >= early_stopping:
-                return fit[-1]
+        if (i - fit[0]) > early_stopping:
+            return fit[-1]
         i += 1
-    return parameters
+    if validation is None or _validation_score() > fit[1]:
+        return parameters
+    return fit[-1]
 
 
 def classifier(parameters, model, X, y,
                batches=None, array=jnp.array,
                class_weight: str='balanced',
-               early_stopping: int=None,
-               deviation=cross_entropy,
+               early_stopping: int=jnp.inf,
+               deviation=None,
                n_outputs: int=None,
                **kwargs):
     """Classifier optimized with optax"""
@@ -132,7 +139,7 @@ def classifier(parameters, model, X, y,
     y_enc = encode(y, n_outputs)
     batches_, splits = create_batches(batches)
     validation = None
-    if early_stopping is not None:
+    if early_stopping < jnp.inf:
         jaccard = Batches.jaccard(splits)
         index = jaccard.argmin()
         validation = batches_[index]
@@ -140,8 +147,12 @@ def classifier(parameters, model, X, y,
 
     if n_outputs == 1:
         objective = deviation_model_binary
+        if deviation is None:
+            deviation = error_binary
     else:
         objective = deviation_model
+        if deviation is None:
+            deviation = error
     return adam(parameters, batches_, objective,
                 early_stopping=early_stopping,
                 validation=validation, model=model,

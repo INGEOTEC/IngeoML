@@ -64,7 +64,8 @@ def test_classifier():
     m = LinearSVC(dual='auto').fit(X, y)
     parameters = dict(W=jnp.array(m.coef_.T),
                       W0=jnp.array(m.intercept_))
-    p = classifier(parameters, modelo, X, y)
+    p = classifier(parameters, modelo, X, y,
+                   deviation=cross_entropy)
     assert np.fabs(p['W'] - parameters['W']).sum() > 0
     diff = p['W0'] - parameters['W0']
     assert np.fabs(diff).sum() > 0
@@ -72,7 +73,8 @@ def test_classifier():
     m = LinearSVC(dual='auto').fit(X, y)
     parameters = dict(W=jnp.array(m.coef_.T),
                       W0=jnp.array(m.intercept_))
-    p2 = classifier(parameters, modelo, X, y)
+    p2 = classifier(parameters, modelo, X, y,
+                    deviation=cross_entropy)
     diff = p2['W0'] - parameters['W0']
     assert np.fabs(diff).sum() > 0
 
