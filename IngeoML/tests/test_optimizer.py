@@ -145,4 +145,4 @@ def test_classifier_error():
     p = classifier(parameters, modelo, X, y,
                    epochs=1,
                    every_k_schedule=1,
-                   deviation=error)
+                   deviation=error)    

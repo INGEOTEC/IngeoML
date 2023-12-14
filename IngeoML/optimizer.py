@@ -17,7 +17,8 @@ from sklearn.metrics import f1_score
 import numpy as np
 import jax
 import jax.numpy as jnp
-import jax.lax as lax
+from jax import lax
+from jax import nn
 import optax
 from IngeoML.utils import Batches, balance_class_weigths, progress_bar, cross_entropy
 
@@ -42,6 +43,16 @@ def adam(parameters, batches, objective,
         parameters = optax.apply_updates(parameters, updates)
         return parameters, estado
 
+    def validation_predictions():
+        X, y, weigths = validation
+        hy = model(parameters, X)
+        if y.ndim == 1:
+            hy = np.where(hy.flatten() > 0, 1, 0)
+        else:
+            hy = hy.argmax(axis=1)
+            y = y.argmax(axis=1)
+        return y, hy
+
     optimizador = optax.adam(learning_rate=learning_rate, **kwargs)
     if validation_score is None:
         validation_score = lambda y, hy: f1_score(y, hy, average='macro')
@@ -52,26 +63,18 @@ def adam(parameters, batches, objective,
     estado = optimizador.init(parameters)
     objective_grad  = jax.grad(objective)
     total = epochs * len(batches)
-    fit, best = None, None
+    fit = None
     i = 0        
     for _, (X, y, weigths) in progress_bar(product(range(epochs),
                                                    batches), total=total):
         p, estado = evaluacion(parameters, estado, X, y, weigths)
         parameters = jax.tree_map(update_finite, parameters, p)
         if validation is not None and (i % every_k_schedule) == 0:
-            X, y, weigths = validation
-            hy = model(parameters, X)
-            if y.ndim == 1:
-                hy = np.where(hy.flatten() > 0, 1, 0)
-            else:
-                hy = hy.argmax(axis=1)
-                y = y.argmax(axis=1)
-            comp = validation_score(y, hy)
+            comp = validation_score(*validation_predictions())
             if fit is None or comp > fit[1]:
-                fit = (i, comp)
-                best = parameters
+                fit = (i, comp, parameters)
             elif (i - fit[0]) // every_k_schedule >= early_stopping:
-                return best
+                return fit[-1]
         i += 1
     return parameters
 
@@ -88,14 +91,14 @@ def classifier(parameters, model, X, y,
     @jax.jit
     def deviation_model_binary(params, X, y, weigths):
         hy = model(params, X)
-        hy = 1 / (1 + jnp.exp(-hy))
+        hy = nn.sigmoid(hy)
         hy = hy.flatten()
         return deviation(y, hy, weigths)
 
     @jax.jit
     def deviation_model(params, X, y, weigths):
         hy = model(params, X)
-        hy = jax.nn.softmax(hy, axis=-1)
+        hy = nn.softmax(hy, axis=-1)
         return deviation(y, hy, weigths)
     
     def encode(y, n_outputs):
@@ -125,7 +128,7 @@ def classifier(parameters, model, X, y,
         return batches_, splits
 
     if n_outputs is None:
-        n_outputs = model(parameters, X).shape[-1]
+        n_outputs = model(parameters, array(X)).shape[-1]
     y_enc = encode(y, n_outputs)
     batches_, splits = create_batches(batches)
     validation = None

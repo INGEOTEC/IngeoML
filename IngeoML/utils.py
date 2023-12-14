@@ -14,7 +14,8 @@
 
 import jax
 import jax.numpy as jnp
-import jax.lax as lax
+from jax import lax
+from jax import nn
 import numpy as np
 from sklearn.utils import check_random_state
 try:
@@ -249,4 +250,17 @@ def error(y, hy, weigths):
 
     res = y * hy
     res = res.sum(axis=-1) - 1 / y.shape[1]
-    return 1 - (jax.nn.sigmoid(100 * res) * weigths).sum(axis=-1)
+    return 1 - (nn.sigmoid(1e3 * res) * weigths).sum(axis=-1)
+
+
+@jax.jit
+def error_binary(y, hy, weigths):
+    """Error
+
+    :param y: Gold standard
+    :param hy: Predictions
+    :param weigths: Weights for each element    
+    """
+    y_ = jnp.vstack((y, 1 - y)).T
+    hy_ = jnp.vstack((hy, 1 - hy)).T
+    return error(y_, hy_, weigths)

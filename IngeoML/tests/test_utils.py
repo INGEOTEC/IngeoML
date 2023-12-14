@@ -13,7 +13,12 @@
 # limitations under the License.
 import numpy as np
 import jax.numpy as jnp
-from IngeoML.utils import Batches, balance_class_weigths, cross_entropy, error
+from jax import nn
+import jax
+from sklearn.datasets import load_iris, load_breast_cancer
+from sklearn.svm import LinearSVC
+from sklearn.preprocessing import OneHotEncoder
+from IngeoML.utils import Batches, balance_class_weigths, cross_entropy, error, error_binary
 
 
 def test_batches():
@@ -113,9 +118,70 @@ def test_error():
                    [1, 0],
                    [0, 1]])
     hy = jnp.array([[0.9, 0.1],
-                    [0.6, 0.4],
-                    [0.6, 0.4]])
+                    [0.49, 1 - 0.49],
+                    [0.1, 0.9]])
     w = jnp.array([1/3, 1/3, 1/3])
     value = error(y, hy, w)
     # assert value is None
-    assert jnp.fabs(value - 0.33333334) < 1e-6
+    assert jnp.fabs(value - 0.33331817) < 1e-6
+
+
+def test_error_binary():
+    y = jnp.array([1, 0, 1])
+    hy = jnp.array([1, 0.55, 1])
+    w = jnp.array([1/3, 1/3, 1/3])
+    value = error_binary(y, hy, w)
+    # assert value is None
+    assert jnp.fabs(value - 0.3333333) < 1e-6
+
+
+def test_error_grad():
+    @jax.jit
+    def modelo(params, X):
+        Y = X @ params['W'] + params['W0']
+        return Y
+    
+    @jax.jit
+    def deviation_model(params, X, y, weigths):
+        hy = modelo(params, X)
+        hy = jax.nn.softmax(hy, axis=-1)
+        return error(y, hy, weigths)        
+    
+    X, y = load_iris(return_X_y=True)
+    encoder = OneHotEncoder(sparse_output=False).fit(y.reshape(-1, 1))
+    y_enc = encoder.transform(y.reshape(-1, 1))
+    m = LinearSVC(dual='auto').fit(X, y)
+    parameters = dict(W=m.coef_.T,
+                      W0=m.intercept_)
+    grad = jax.grad(deviation_model)
+    w = jnp.ones(y.shape[0]) / y.shape[0]
+    p = grad(parameters, X, y_enc, w)
+    # assert p is None
+    assert jnp.fabs(p['W']).sum() > 0
+
+
+def test_error_binary_grad():
+    @jax.jit
+    def modelo(params, X):
+        Y = X @ params['W'] + params['W0']
+        return Y
+    
+    @jax.jit
+    def deviation_model(params, X, y, weigths):
+        hy = modelo(params, X)
+        hy = nn.sigmoid(hy)
+        hy = hy.flatten()        
+        return error_binary(y, hy, weigths)        
+    
+    X, y = load_breast_cancer(return_X_y=True)
+    labels = np.unique(y)            
+    h = {v:k for k, v in enumerate(labels)}
+    y_enc = np.array([h[x] for x in y])
+    m = LinearSVC(dual='auto').fit(X, y)
+    parameters = dict(W=m.coef_.T,
+                      W0=m.intercept_)
+    grad = jax.grad(deviation_model)
+    w = jnp.ones(y.shape[0]) / y.shape[0]
+    p = grad(parameters, X, y_enc, w)
+    # assert p is None
+    assert jnp.fabs(p['W']).sum() > 0    
