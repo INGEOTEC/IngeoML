@@ -96,7 +96,7 @@ def test_classifier_early_stopping():
     p = classifier(parameters, modelo, X, y,
                    epochs=10,
                    batches=batches,
-                   early_stopping=2,
+                   n_iter_no_change=2,
                    every_k_schedule=2,
                    learning_rate=1e-1)
     X, y = load_breast_cancer(return_X_y=True)
@@ -106,7 +106,7 @@ def test_classifier_early_stopping():
     p2 = classifier(parameters, modelo, X, y,
                     epochs=10,
                     batches=batches,
-                    early_stopping=2,
+                    n_iter_no_change=2,
                     every_k_schedule=2,
                     learning_rate=1e-1)
     
@@ -159,13 +159,13 @@ def test_classifier_validation():
                       W0=m.intercept_)
     p = classifier(parameters, modelo, X, y,
                    epochs=3, every_k_schedule=2,
-                   early_stopping=2, validation=split)
+                   n_iter_no_change=2, validation=split)
     
     tr, vs = next(split.split(X, y))
     validation = [X[vs], y[vs]]
     p = classifier(parameters, modelo, X[tr], y[tr],
                    epochs=3, every_k_schedule=2,
-                   early_stopping=2,
+                   n_iter_no_change=2,
                    validation=validation)
 
    

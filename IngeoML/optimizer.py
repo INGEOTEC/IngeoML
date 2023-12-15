@@ -26,7 +26,7 @@ from IngeoML.utils import Batches, balance_class_weigths, progress_bar, error, e
 def adam(parameters, batches, objective, 
          epochs: int=5, learning_rate: float=1e-2, 
          every_k_schedule: int=None,
-         early_stopping: int=jnp.inf,
+         n_iter_no_change: int=jnp.inf,
          validation=None, model=None,
          validation_score=None, **kwargs):
     """adam optimizer"""
@@ -69,7 +69,7 @@ def adam(parameters, batches, objective,
     objective_grad  = jax.grad(objective)
     fit = (1, _validation_score(), parameters)
     i = 1
-    early_stopping = early_stopping * every_k_schedule
+    n_iter_no_change = n_iter_no_change * every_k_schedule
     for _, (X, y, weigths) in progress_bar(product(range(epochs),
                                                    batches), total=total):
         p, estado = evaluacion(parameters, estado, X, y, weigths)
@@ -78,7 +78,7 @@ def adam(parameters, batches, objective,
             comp = _validation_score()
             if comp > fit[1]:
                 fit = (i, comp, parameters)
-        if (i - fit[0]) > early_stopping:
+        if (i - fit[0]) > n_iter_no_change:
             return fit[-1]
         i += 1
     if validation is None or _validation_score() > fit[1]:
@@ -87,7 +87,7 @@ def adam(parameters, batches, objective,
 
 
 def classifier(parameters, model, X, y, batches=None, array=jnp.array,
-               class_weight: str='balanced', early_stopping: int=jnp.inf,
+               class_weight: str='balanced', n_iter_no_change: int=jnp.inf,
                deviation=None, n_outputs: int=None, validation=None,
                **kwargs):
     """Classifier optimized with optax"""
@@ -147,7 +147,7 @@ def classifier(parameters, model, X, y, batches=None, array=jnp.array,
             validation = [array(validation[0]), jnp.array(validation[1])]
         return validation, X, y_enc, y
 
-    def _objective():
+    def _objective(deviation):
         if n_outputs == 1:
             objective = deviation_model_binary
             if deviation is None:
@@ -163,13 +163,13 @@ def classifier(parameters, model, X, y, batches=None, array=jnp.array,
     y_enc = encode(y, n_outputs, validation)
     validation, X, y_enc, y = _validation(validation, X, y_enc, y)
     batches_, splits = create_batches(batches)
-    if early_stopping < jnp.inf and validation is None:
+    if n_iter_no_change < jnp.inf and validation is None:
         jaccard = Batches.jaccard(splits)
         index = jaccard.argmin()
         validation = batches_[index][:2]
         del batches_[index]
-    objective, deviation = _objective()
+    objective, deviation = _objective(deviation)
     return adam(parameters, batches_, objective,
-                early_stopping=early_stopping,
+                n_iter_no_change=n_iter_no_change,
                 validation=validation, model=model,
                 **kwargs)
