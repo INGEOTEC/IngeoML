@@ -20,7 +20,7 @@ Utils
 --------------------------------------------
 
 .. autoclass:: IngeoML.utils.Batches
-    :members: split
+    :members: split, blocks, distribution
 
 .. automodule:: IngeoML.utils
     :members: balance_class_weigths

@@ -14,11 +14,12 @@
 from sklearn.datasets import load_iris, load_breast_cancer
 from sklearn.svm import LinearSVC
 from sklearn.preprocessing import OneHotEncoder
+from sklearn.model_selection import StratifiedShuffleSplit
 import numpy as np
 import jax.numpy as jnp
 import jax
 from IngeoML.optimizer import adam, classifier
-from IngeoML.utils import Batches
+from IngeoML.utils import Batches, cross_entropy, error
 
 
 def test_adam():
@@ -30,8 +31,8 @@ def test_adam():
     @jax.jit
     def media_entropia_cruzada(params, X, y, pesos):
         hy = modelo(params, X)
-        hy = jax.nn.softmax(jnp.array(hy), axis=0)
-        return - ((y * jnp.log(hy)).sum(axis=1) * pesos).sum()    
+        hy = jax.nn.softmax(jnp.array(hy), axis=1)
+        return - ((y * jnp.log(hy)).sum(axis=1) * pesos).sum()
 
     X, y = load_iris(return_X_y=True)
     m = LinearSVC(dual='auto').fit(X, y)
@@ -64,7 +65,8 @@ def test_classifier():
     m = LinearSVC(dual='auto').fit(X, y)
     parameters = dict(W=jnp.array(m.coef_.T),
                       W0=jnp.array(m.intercept_))
-    p = classifier(parameters, modelo, X, y)
+    p = classifier(parameters, modelo, X, y,
+                   deviation=cross_entropy)
     assert np.fabs(p['W'] - parameters['W']).sum() > 0
     diff = p['W0'] - parameters['W0']
     assert np.fabs(diff).sum() > 0
@@ -72,6 +74,98 @@ def test_classifier():
     m = LinearSVC(dual='auto').fit(X, y)
     parameters = dict(W=jnp.array(m.coef_.T),
                       W0=jnp.array(m.intercept_))
-    p2 = classifier(parameters, modelo, X, y)
+    p2 = classifier(parameters, modelo, X, y,
+                    deviation=cross_entropy)
     diff = p2['W0'] - parameters['W0']
     assert np.fabs(diff).sum() > 0
+
+
+def test_classifier_early_stopping():
+    """Test early stopping"""
+
+    @jax.jit
+    def modelo(params, X):
+        Y = X @ params['W'] + params['W0']
+        return Y
+
+    X, y = load_iris(return_X_y=True)
+    m = LinearSVC(dual='auto').fit(X, y)
+    parameters = dict(W=jnp.array(m.coef_.T),
+                      W0=jnp.array(m.intercept_))
+    batches = Batches(size=45)
+    p = classifier(parameters, modelo, X, y,
+                   epochs=10,
+                   batches=batches,
+                   n_iter_no_change=2,
+                   every_k_schedule=2,
+                   learning_rate=1e-1)
+    X, y = load_breast_cancer(return_X_y=True)
+    m = LinearSVC(dual='auto').fit(X, y)
+    parameters = dict(W=jnp.array(m.coef_.T),
+                      W0=jnp.array(m.intercept_))
+    p2 = classifier(parameters, modelo, X, y,
+                    epochs=10,
+                    batches=batches,
+                    n_iter_no_change=2,
+                    every_k_schedule=2,
+                    learning_rate=1e-1)
+    
+
+def test_classifier_deviation():
+    @jax.jit
+    def modelo(params, X):
+        Y = X @ params['W'] + params['W0']
+        return Y
+    
+    X, y = load_iris(return_X_y=True)
+    m = LinearSVC(dual='auto').fit(X, y)
+    parameters = dict(W=m.coef_.T,
+                      W0=m.intercept_)
+
+    p = classifier(parameters, modelo, X, y,
+                   epochs=1,
+                   every_k_schedule=1,
+                   deviation=cross_entropy)
+    
+
+def test_classifier_error():
+    @jax.jit
+    def modelo(params, X):
+        Y = X @ params['W'] + params['W0']
+        return Y
+    
+    X, y = load_iris(return_X_y=True)
+    m = LinearSVC(dual='auto').fit(X, y)
+    parameters = dict(W=m.coef_.T,
+                      W0=m.intercept_)
+    # assert modelo(parameters, X).shape[-1] is None
+    p = classifier(parameters, modelo, X, y,
+                   epochs=1,
+                   every_k_schedule=1,
+                   deviation=error) 
+
+
+def test_classifier_validation():
+    @jax.jit
+    def modelo(params, X):
+        Y = X @ params['W'] + params['W0']
+        return Y
+    
+    X, y = load_iris(return_X_y=True)
+    split = StratifiedShuffleSplit(n_splits=1,
+                                   test_size=0.2)
+    m = LinearSVC(dual='auto').fit(X, y)
+    parameters = dict(W=m.coef_.T,
+                      W0=m.intercept_)
+    p = classifier(parameters, modelo, X, y,
+                   epochs=3, every_k_schedule=2,
+                   n_iter_no_change=2, validation=split)
+    
+    tr, vs = next(split.split(X, y))
+    validation = [X[vs], y[vs]]
+    p = classifier(parameters, modelo, X[tr], y[tr],
+                   epochs=3, every_k_schedule=2,
+                   n_iter_no_change=2,
+                   validation=validation)
+
+   
