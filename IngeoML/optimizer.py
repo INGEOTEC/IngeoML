@@ -46,7 +46,7 @@ def adam(parameters, batches, objective,
     def _validation_score():
         if validation is None:
             return - jnp.inf
-        X, y, weigths = validation
+        X, y = validation
         hy = model(parameters, X)
         if y.ndim == 1:
             hy = np.where(hy.flatten() > 0, 1, 0)
@@ -86,12 +86,9 @@ def adam(parameters, batches, objective,
     return fit[-1]
 
 
-def classifier(parameters, model, X, y,
-               batches=None, array=jnp.array,
-               class_weight: str='balanced',
-               early_stopping: int=jnp.inf,
-               deviation=None,
-               n_outputs: int=None,
+def classifier(parameters, model, X, y, batches=None, array=jnp.array,
+               class_weight: str='balanced', early_stopping: int=jnp.inf,
+               deviation=None, n_outputs: int=None, validation=None,
                **kwargs):
     """Classifier optimized with optax"""
 
@@ -108,14 +105,20 @@ def classifier(parameters, model, X, y,
         hy = nn.softmax(hy, axis=-1)
         return deviation(y, hy, weigths)
     
-    def encode(y, n_outputs):
+    def encode(y, n_outputs, validation):
         if n_outputs == 1:
             labels = np.unique(y)            
             h = {v:k for k, v in enumerate(labels)}
             y_enc = np.array([h[x] for x in y])
+            if validation is not None and not hasattr(validation, 'split'):
+                _ = validation[1]
+                validation[1] = np.array([h[x] for x in _])
         else:
             encoder = OneHotEncoder(sparse_output=False).fit(y.reshape(-1, 1))
             y_enc = encoder.transform(y.reshape(-1, 1))
+            if validation is not None and not hasattr(validation, 'split'):
+                _ = validation[1]
+                validation[1] = encoder.transform(_.reshape(-1, 1))
         return y_enc
 
     def create_batches(batches):
@@ -134,25 +137,38 @@ def classifier(parameters, model, X, y,
                              jnp.array(balance(y[idx]))))
         return batches_, splits
 
+    def _validation(validation, X, y_enc, y):
+        if validation is not None and hasattr(validation, 'split'):
+            tr, vs = next(validation.split(X, y))
+            validation = [array(X[vs]), jnp.array(y_enc[vs])]
+            X, y_enc = X[tr], y_enc[tr]
+            y = y[tr]
+        elif validation is not None and not hasattr(validation, 'split'):
+            validation = [array(validation[0]), jnp.array(validation[1])]
+        return validation, X, y_enc, y
+
+    def _objective():
+        if n_outputs == 1:
+            objective = deviation_model_binary
+            if deviation is None:
+                deviation = error_binary
+        else:
+            objective = deviation_model
+            if deviation is None:
+                deviation = error
+        return objective, deviation
+
     if n_outputs is None:
-        n_outputs = model(parameters, array(X)).shape[-1]
-    y_enc = encode(y, n_outputs)
+        n_outputs = model(parameters, array(X[:1])).shape[-1]
+    y_enc = encode(y, n_outputs, validation)
+    validation, X, y_enc, y = _validation(validation, X, y_enc, y)
     batches_, splits = create_batches(batches)
-    validation = None
-    if early_stopping < jnp.inf:
+    if early_stopping < jnp.inf and validation is None:
         jaccard = Batches.jaccard(splits)
         index = jaccard.argmin()
-        validation = batches_[index]
+        validation = batches_[index][:2]
         del batches_[index]
-
-    if n_outputs == 1:
-        objective = deviation_model_binary
-        if deviation is None:
-            deviation = error_binary
-    else:
-        objective = deviation_model
-        if deviation is None:
-            deviation = error
+    objective, deviation = _objective()
     return adam(parameters, batches_, objective,
                 early_stopping=early_stopping,
                 validation=validation, model=model,
