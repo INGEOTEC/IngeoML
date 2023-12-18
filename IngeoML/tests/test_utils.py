@@ -18,7 +18,7 @@ import jax
 from sklearn.datasets import load_iris, load_breast_cancer
 from sklearn.svm import LinearSVC
 from sklearn.preprocessing import OneHotEncoder
-from IngeoML.utils import Batches, balance_class_weigths, cross_entropy, error, error_binary
+from IngeoML.utils import Batches, balance_class_weigths, cross_entropy, soft_error, soft_error_binary
 
 
 def test_batches():
@@ -113,7 +113,8 @@ def test_cross_entropy():
     assert jnp.fabs(value - 0.3285041) < 1e-6
 
 
-def test_error():
+def test_soft_error():
+    """Test soft error"""
     y = jnp.array([[1, 0],
                    [1, 0],
                    [0, 1]])
@@ -121,21 +122,23 @@ def test_error():
                     [0.49, 1 - 0.49],
                     [0.1, 0.9]])
     w = jnp.array([1/3, 1/3, 1/3])
-    value = error(y, hy, w)
+    value = soft_error(y, hy, w)
     # assert value is None
     assert jnp.fabs(value - 0.33331817) < 1e-6
 
 
-def test_error_binary():
+def test_soft_error_binary():
+    """Test soft error binary"""
     y = jnp.array([1, 0, 1])
     hy = jnp.array([1, 0.55, 1])
     w = jnp.array([1/3, 1/3, 1/3])
-    value = error_binary(y, hy, w)
+    value = soft_error_binary(y, hy, w)
     # assert value is None
     assert jnp.fabs(value - 0.3333333) < 1e-6
 
 
-def test_error_grad():
+def test_soft_error_grad():
+    """Test soft error grad"""
     @jax.jit
     def modelo(params, X):
         Y = X @ params['W'] + params['W0']
@@ -145,7 +148,7 @@ def test_error_grad():
     def deviation_model(params, X, y, weigths):
         hy = modelo(params, X)
         hy = jax.nn.softmax(hy, axis=-1)
-        return error(y, hy, weigths)        
+        return soft_error(y, hy, weigths)        
     
     X, y = load_iris(return_X_y=True)
     encoder = OneHotEncoder(sparse_output=False).fit(y.reshape(-1, 1))
@@ -160,7 +163,8 @@ def test_error_grad():
     assert jnp.fabs(p['W']).sum() > 0
 
 
-def test_error_binary_grad():
+def test_soft_error_binary_grad():
+    """Test soft-error-binary grad"""
     @jax.jit
     def modelo(params, X):
         Y = X @ params['W'] + params['W0']
@@ -171,7 +175,7 @@ def test_error_binary_grad():
         hy = modelo(params, X)
         hy = nn.sigmoid(hy)
         hy = hy.flatten()        
-        return error_binary(y, hy, weigths)        
+        return soft_error_binary(y, hy, weigths)        
     
     X, y = load_breast_cancer(return_X_y=True)
     labels = np.unique(y)            

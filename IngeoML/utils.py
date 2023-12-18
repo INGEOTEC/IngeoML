@@ -240,8 +240,8 @@ def cross_entropy(y, hy, weigths):
 
 
 @jax.jit
-def error(y, hy, weigths):
-    """Error
+def soft_error(y, hy, weigths):
+    """Soft Error
 
     :param y: Gold standard
     :param hy: Predictions
@@ -254,8 +254,8 @@ def error(y, hy, weigths):
 
 
 @jax.jit
-def error_binary(y, hy, weigths):
-    """Error
+def soft_error_binary(y, hy, weigths):
+    """Soft Error
 
     :param y: Gold standard
     :param hy: Predictions
@@ -263,4 +263,4 @@ def error_binary(y, hy, weigths):
     """
     y_ = jnp.vstack((y, 1 - y)).T
     hy_ = jnp.vstack((hy, 1 - hy)).T
-    return error(y_, hy_, weigths)
+    return soft_error(y_, hy_, weigths)

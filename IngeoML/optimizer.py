@@ -20,7 +20,7 @@ import jax.numpy as jnp
 from jax import lax
 from jax import nn
 import optax
-from IngeoML.utils import Batches, balance_class_weigths, progress_bar, error, error_binary
+from IngeoML.utils import Batches, balance_class_weigths, progress_bar, soft_error, soft_error_binary
 
 
 def adam(parameters, batches, objective, 
@@ -104,10 +104,10 @@ def classifier(parameters, model, X, y, batches=None, array=jnp.array,
         hy = model(params, X)
         hy = nn.softmax(hy, axis=-1)
         return deviation(y, hy, weigths)
-    
+
     def encode(y, n_outputs, validation):
         if n_outputs == 1:
-            labels = np.unique(y)            
+            labels = np.unique(y)
             h = {v:k for k, v in enumerate(labels)}
             y_enc = np.array([h[x] for x in y])
             if validation is not None and not hasattr(validation, 'split'):
@@ -151,11 +151,11 @@ def classifier(parameters, model, X, y, batches=None, array=jnp.array,
         if n_outputs == 1:
             objective = deviation_model_binary
             if deviation is None:
-                deviation = error_binary
+                deviation = soft_error_binary
         else:
             objective = deviation_model
             if deviation is None:
-                deviation = error
+                deviation = soft_error
         return objective, deviation
 
     if n_outputs is None:
