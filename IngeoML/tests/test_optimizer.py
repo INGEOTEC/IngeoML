@@ -19,7 +19,7 @@ import numpy as np
 import jax.numpy as jnp
 import jax
 from IngeoML.optimizer import adam, classifier
-from IngeoML.utils import Batches, cross_entropy, error
+from IngeoML.utils import Batches, cross_entropy, soft_error
 
 
 def test_adam():
@@ -142,7 +142,7 @@ def test_classifier_error():
     p = classifier(parameters, modelo, X, y,
                    epochs=1,
                    every_k_schedule=1,
-                   deviation=error) 
+                   deviation=soft_error) 
 
 
 def test_classifier_validation():

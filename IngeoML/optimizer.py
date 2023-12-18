@@ -20,7 +20,7 @@ import jax.numpy as jnp
 from jax import lax
 from jax import nn
 import optax
-from IngeoML.utils import Batches, balance_class_weigths, progress_bar, soft_error, soft_error_binary
+from IngeoML.utils import Batches, balance_class_weigths, progress_bar, soft_error
 
 
 def adam(parameters, batches, objective, 
@@ -97,7 +97,9 @@ def classifier(parameters, model, X, y, batches=None, array=jnp.array,
         hy = model(params, X)
         hy = nn.sigmoid(hy)
         hy = hy.flatten()
-        return deviation(y, hy, weigths)
+        y_ = jnp.vstack((y, 1 - y)).T
+        hy_ = jnp.vstack((hy, 1 - hy)).T        
+        return deviation(y_, hy_, weigths)
 
     @jax.jit
     def deviation_model(params, X, y, weigths):
@@ -148,14 +150,12 @@ def classifier(parameters, model, X, y, batches=None, array=jnp.array,
         return validation, X, y_enc, y
 
     def _objective(deviation):
+        if deviation is None:
+            deviation = soft_error
         if n_outputs == 1:
             objective = deviation_model_binary
-            if deviation is None:
-                deviation = soft_error_binary
         else:
             objective = deviation_model
-            if deviation is None:
-                deviation = soft_error
         return objective, deviation
 
     if n_outputs is None:

@@ -254,13 +254,57 @@ def soft_error(y, hy, weigths):
 
 
 @jax.jit
-def soft_error_binary(y, hy, weigths):
-    """Soft Error
+def soft_recall(y, hy, weigths=None):
+    """Soft Recall
 
     :param y: Gold standard
     :param hy: Predictions
-    :param weigths: Weights for each element    
+    :param weigths: Weights are not used    
     """
-    y_ = jnp.vstack((y, 1 - y)).T
-    hy_ = jnp.vstack((hy, 1 - hy)).T
-    return soft_error(y_, hy_, weigths)
+    hy = nn.sigmoid((hy - 1 / y.shape[1]) * 1e3)
+    res = y * hy
+    return res.sum(axis=0) / y.sum(axis=0)
+
+
+@jax.jit
+def soft_BER(y, hy, weigths=None):
+    return 1 - soft_recall(y, hy).mean()
+    
+
+@jax.jit
+def soft_precision(y, hy, weigths=None):
+    """Soft Recall
+
+    :param y: Gold standard
+    :param hy: Predictions
+    :param weigths: Weights are not used    
+    """
+    hy = nn.sigmoid((hy - 1 / y.shape[1]) * 1e3)
+    res = y * hy
+    return res.sum(axis=0) / hy.sum(axis=0)
+
+
+@jax.jit
+def soft_f1_score(y, hy, weigths=None):
+    """Soft F1 score
+
+    :param y: Gold standard
+    :param hy: Predictions
+    :param weigths: Weights are not used    
+    """
+
+    recall = soft_recall(y, hy)
+    precision = soft_precision(y, hy)
+    return 2 * recall * precision / (recall + precision)
+
+
+@jax.jit
+def soft_comp_macro_f1(y, hy, weigths=None):
+    """Soft Complement macro-F1
+
+    :param y: Gold standard
+    :param hy: Predictions
+    :param weigths: Weights are not used    
+    """
+
+    return 1 - soft_f1_score(y, hy).mean()
