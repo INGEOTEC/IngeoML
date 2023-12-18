@@ -19,7 +19,7 @@ import numpy as np
 import jax.numpy as jnp
 import jax
 from IngeoML.optimizer import adam, classifier
-from IngeoML.utils import Batches, cross_entropy, soft_error
+from IngeoML.utils import Batches, cross_entropy, soft_error, soft_comp_macro_f1
 
 
 def test_adam():
@@ -168,4 +168,19 @@ def test_classifier_validation():
                    n_iter_no_change=2,
                    validation=validation)
 
-   
+def test_classifier_evolution():
+    """Test the evolution feature"""
+    @jax.jit
+    def modelo(params, X):
+        Y = X @ params['W'] + params['W0']
+        return Y
+
+    X, y = load_iris(return_X_y=True)
+    m = LinearSVC(dual='auto').fit(X, y)
+    parameters = dict(W=jnp.array(m.coef_.T),
+                      W0=jnp.array(m.intercept_))
+    p, evolution = classifier(parameters, modelo, X, y,
+                              return_evolution=True,
+                              n_iter_no_change=2,
+                              deviation=soft_comp_macro_f1)
+    assert len(evolution) and evolution[0][1] > 0.9
