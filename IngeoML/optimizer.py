@@ -20,7 +20,7 @@ import jax.numpy as jnp
 from jax import lax
 from jax import nn
 import optax
-from IngeoML.utils import Batches, balance_class_weigths, progress_bar, error, error_binary
+from IngeoML.utils import Batches, balance_class_weigths, progress_bar, soft_error
 
 
 def adam(parameters, batches, objective, 
@@ -28,6 +28,7 @@ def adam(parameters, batches, objective,
          every_k_schedule: int=None,
          n_iter_no_change: int=jnp.inf,
          validation=None, model=None,
+         return_evolution=None,
          validation_score=None, **kwargs):
     """adam optimizer"""
 
@@ -55,6 +56,11 @@ def adam(parameters, batches, objective,
             y = y.argmax(axis=1)
         return validation_score(y, hy)
 
+    def set_output(value):
+        if return_evolution:
+            return value, evolution
+        return value
+    
     optimizador = optax.adam(learning_rate=learning_rate, **kwargs)
     if validation_score is None:
         validation_score = lambda y, hy: f1_score(y, hy, average='macro')
@@ -68,6 +74,7 @@ def adam(parameters, batches, objective,
     estado = optimizador.init(parameters)
     objective_grad  = jax.grad(objective)
     fit = (1, _validation_score(), parameters)
+    evolution = [fit[:2]]
     i = 1
     n_iter_no_change = n_iter_no_change * every_k_schedule
     for _, (X, y, weigths) in progress_bar(product(range(epochs),
@@ -76,14 +83,19 @@ def adam(parameters, batches, objective,
         parameters = jax.tree_map(update_finite, parameters, p)
         if (i % every_k_schedule) == 0:
             comp = _validation_score()
+            evolution.append((i, comp))
             if comp > fit[1]:
                 fit = (i, comp, parameters)
+            if comp >= 1:
+                return set_output(fit[-1])
         if (i - fit[0]) > n_iter_no_change:
-            return fit[-1]
+            return set_output(fit[-1])
         i += 1
-    if validation is None or _validation_score() > fit[1]:
-        return parameters
-    return fit[-1]
+    comp = _validation_score()
+    evolution.append((i, comp))
+    if validation is None or comp > fit[1]:
+        return set_output(parameters)
+    return set_output(fit[-1])
 
 
 def classifier(parameters, model, X, y, batches=None, array=jnp.array,
@@ -97,17 +109,19 @@ def classifier(parameters, model, X, y, batches=None, array=jnp.array,
         hy = model(params, X)
         hy = nn.sigmoid(hy)
         hy = hy.flatten()
-        return deviation(y, hy, weigths)
+        y_ = jnp.vstack((y, 1 - y)).T
+        hy_ = jnp.vstack((hy, 1 - hy)).T        
+        return deviation(y_, hy_, weigths)
 
     @jax.jit
     def deviation_model(params, X, y, weigths):
         hy = model(params, X)
         hy = nn.softmax(hy, axis=-1)
         return deviation(y, hy, weigths)
-    
+
     def encode(y, n_outputs, validation):
         if n_outputs == 1:
-            labels = np.unique(y)            
+            labels = np.unique(y)
             h = {v:k for k, v in enumerate(labels)}
             y_enc = np.array([h[x] for x in y])
             if validation is not None and not hasattr(validation, 'split'):
@@ -148,14 +162,12 @@ def classifier(parameters, model, X, y, batches=None, array=jnp.array,
         return validation, X, y_enc, y
 
     def _objective(deviation):
+        if deviation is None:
+            deviation = soft_error
         if n_outputs == 1:
             objective = deviation_model_binary
-            if deviation is None:
-                deviation = error_binary
         else:
             objective = deviation_model
-            if deviation is None:
-                deviation = error
         return objective, deviation
 
     if n_outputs is None:
