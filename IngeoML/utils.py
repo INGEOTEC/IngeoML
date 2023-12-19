@@ -14,7 +14,6 @@
 
 import jax
 import jax.numpy as jnp
-from jax import lax
 from jax import nn
 import numpy as np
 from sklearn.utils import check_random_state
@@ -65,7 +64,7 @@ class Batches:
     def __init__(self, size: int=64,
                  strategy: str='stratified',
                  remainder: str='fill',
-                 shuffle: bool=True,            
+                 shuffle: bool=True,
                  random_state: int=None) -> None:
         self.size = size
         self.strategy = strategy
@@ -198,7 +197,7 @@ class Batches:
         if self.strategy == 'stratified':
             return self._split_stratified(y)
         raise NotImplementedError(f'Missing {self.strategy}')
-    
+
     @staticmethod
     def jaccard(splits: np.ndarray) -> np.ndarray:
         """Jaccard index between splits"""
