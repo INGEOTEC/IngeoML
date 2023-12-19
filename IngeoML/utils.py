@@ -14,7 +14,6 @@
 
 import jax
 import jax.numpy as jnp
-from jax import lax
 from jax import nn
 import numpy as np
 from sklearn.utils import check_random_state
@@ -65,7 +64,7 @@ class Batches:
     def __init__(self, size: int=64,
                  strategy: str='stratified',
                  remainder: str='fill',
-                 shuffle: bool=True,            
+                 shuffle: bool=True,
                  random_state: int=None) -> None:
         self.size = size
         self.strategy = strategy
@@ -198,7 +197,7 @@ class Batches:
         if self.strategy == 'stratified':
             return self._split_stratified(y)
         raise NotImplementedError(f'Missing {self.strategy}')
-    
+
     @staticmethod
     def jaccard(splits: np.ndarray) -> np.ndarray:
         """Jaccard index between splits"""
@@ -215,8 +214,15 @@ class Batches:
         return output
 
 
-def balance_class_weigths(labels):
-    """Weights of the labels set to balance"""
+def balance_class_weights(labels) -> np.ndarray:
+    """Weights of the labels set to balance
+    
+    >>> import numpy as np
+    >>> from IngeoML.utils import balance_class_weights
+    >>> balance_class_weights(np.array(['a', 'a', 'b']))
+    array([0.25, 0.25, 0.5 ])
+    """
+
     y_ = labels
     labels, cnts = np.unique(y_, return_counts=True)
     weigths = np.empty(y_.shape[0])
@@ -227,12 +233,24 @@ def balance_class_weigths(labels):
 
 
 @jax.jit
-def cross_entropy(y, hy, weigths):
+def cross_entropy(y: jnp.array, hy: jnp.array, weigths: jnp.array) -> jnp.array:
     """Cross-entropy loss
     
     :param y: Gold standard
     :param hy: Predictions
     :param weigths: Weights for each element
+
+    >>> import jax.numpy as jnp
+    >>> from IngeoML.utils import cross_entropy
+    >>> y = jnp.array([[1, 0],
+                       [1, 0],
+                       [0, 1]])
+    >>> hy = jnp.array([[0.9, 0.1],
+                        [0.6, 0.4],
+                        [0.2, 0.8]])
+    >>> w = jnp.array([1/3, 1/3, 1/3])
+    >>> cross_entropy(y, hy, w)
+    Array(0.27977654, dtype=float32)    
     """
 
     values = - ((y * jnp.log(hy)).sum(axis=-1) * weigths)
@@ -240,12 +258,24 @@ def cross_entropy(y, hy, weigths):
 
 
 @jax.jit
-def soft_error(y, hy, weigths):
+def soft_error(y: jnp.array, hy: jnp.array, weigths: jnp.array) -> jnp.array:
     """Soft Error
 
     :param y: Gold standard
     :param hy: Predictions
-    :param weigths: Weights for each element    
+    :param weigths: Weights for each element
+
+    >>> import jax.numpy as jnp
+    >>> from IngeoML.utils import soft_error
+    >>> y = jnp.array([[1, 0],
+                       [1, 0],
+                       [0, 1]])
+    >>> hy = jnp.array([[0.9, 0.1],
+                        [0.4999, 1 - 0.4999],
+                        [0.1, 0.9]])
+    >>> w = jnp.array([1/3, 1/3, 1/3])
+    >>> soft_error(y, hy, w)
+    Array(0.17499197, dtype=float32)    
     """
 
     res = y * hy
@@ -254,43 +284,121 @@ def soft_error(y, hy, weigths):
 
 
 @jax.jit
-def soft_recall(y, hy, weigths=None):
+def soft_BER(y: jnp.array, hy: jnp.array, weigths=None) -> jnp.array:
+    """Soft Balanced Error Rate
+    
+    :param y: Gold standard
+    :param hy: Predictions
+    :param weigths: Weights are not used
+
+    >>> import jax.numpy as jnp
+    >>> from IngeoML.utils import soft_BER
+    >>> y = jnp.array([[1, 0],
+                       [1, 0],
+                       [0, 1]])
+    >>> hy = jnp.array([[0.9, 0.1],
+                        [0.4999, 1 - 0.4999],
+                        [0.1, 0.9]])
+    >>> w = jnp.array([1/3, 1/3, 1/3])
+    >>> soft_BER(y, hy, w)
+    Array(0.13124394, dtype=float32)        
+    """
+
+    return 1 - soft_recall(y, hy).mean()
+
+
+@jax.jit
+def soft_recall(y: jnp.array, hy: jnp.array, weigths=None) -> jnp.array:
     """Soft Recall
 
     :param y: Gold standard
     :param hy: Predictions
-    :param weigths: Weights are not used    
+    :param weigths: Weights are not used
+
+    >>> import jax.numpy as jnp
+    >>> from IngeoML.utils import soft_recall
+    >>> y = jnp.array([[1, 0, 0],
+                       [1, 0, 0],
+                       [0, 1, 0],
+                       [0, 0, 1],
+                       [0, 0, 1],
+                       [0, 0, 1],
+                       [0, 0, 1]])
+    >>> hy = jnp.array([[1, 0, 0],
+                        [0, 1, 0],
+                        [0, 1, 0],
+                        [0, 0, 1],
+                        [1, 0, 0],
+                        [1, 0, 0],
+                        [0, 1, 0]])
+    >>> soft_recall(y, hy)
+    Array([0.5, 1.0, 0.25], dtype=float32)
     """
+
     hy = nn.sigmoid((hy - 1 / y.shape[1]) * 1e3)
     res = y * hy
     return res.sum(axis=0) / y.sum(axis=0)
 
 
 @jax.jit
-def soft_BER(y, hy, weigths=None):
-    return 1 - soft_recall(y, hy).mean()
-    
-
-@jax.jit
-def soft_precision(y, hy, weigths=None):
+def soft_precision(y: jnp.array, hy: jnp.array, weigths=None) -> jnp.array:
     """Soft Recall
 
     :param y: Gold standard
     :param hy: Predictions
-    :param weigths: Weights are not used    
+    :param weigths: Weights are not used
+
+    >>> import jax.numpy as jnp
+    >>> from IngeoML.utils import soft_precision
+    >>> y = jnp.array([[1, 0, 0],
+                       [1, 0, 0],
+                       [0, 1, 0],
+                       [0, 0, 1],
+                       [0, 0, 1],
+                       [0, 0, 1],
+                       [0, 0, 1]])
+    >>> hy = jnp.array([[1, 0, 0],
+                        [0, 1, 0],
+                        [0, 1, 0],
+                        [0, 0, 1],
+                        [1, 0, 0],
+                        [1, 0, 0],
+                        [0, 1, 0]])
+    >>> soft_precision(y, hy)
+    Array([0.33333334, 0.33333334, 1.0], dtype=float32)
     """
+
     hy = nn.sigmoid((hy - 1 / y.shape[1]) * 1e3)
     res = y * hy
     return res.sum(axis=0) / hy.sum(axis=0)
 
 
 @jax.jit
-def soft_f1_score(y, hy, weigths=None):
+def soft_f1_score(y: jnp.array, hy: jnp.array, weigths=None) -> jnp.array:
     """Soft F1 score
 
     :param y: Gold standard
     :param hy: Predictions
-    :param weigths: Weights are not used    
+    :param weigths: Weights are not used
+
+    >>> import jax.numpy as jnp
+    >>> from IngeoML.utils import soft_f1_score
+    >>> y = jnp.array([[1, 0, 0],
+                       [1, 0, 0],
+                       [0, 1, 0],
+                       [0, 0, 1],
+                       [0, 0, 1],
+                       [0, 0, 1],
+                       [0, 0, 1]])
+    >>> hy = jnp.array([[1, 0, 0],
+                        [0, 1, 0],
+                        [0, 1, 0],
+                        [0, 0, 1],
+                        [1, 0, 0],
+                        [1, 0, 0],
+                        [0, 1, 0]])
+    >>> soft_f1_score(y, hy)
+    Array([0.4, 0.5, 0.4], dtype=float32)
     """
 
     recall = soft_recall(y, hy)
@@ -299,12 +407,31 @@ def soft_f1_score(y, hy, weigths=None):
 
 
 @jax.jit
-def soft_comp_macro_f1(y, hy, weigths=None):
+def soft_comp_macro_f1(y: jnp.array, hy: jnp.array, weigths=None) -> jnp.array:
     """Soft Complement macro-F1
 
     :param y: Gold standard
     :param hy: Predictions
-    :param weigths: Weights are not used    
+    :param weigths: Weights are not used
+
+    >>> import jax.numpy as jnp
+    >>> from IngeoML.utils import soft_comp_macro_f1
+    >>> y = jnp.array([[1, 0, 0],
+                       [1, 0, 0],
+                       [0, 1, 0],
+                       [0, 0, 1],
+                       [0, 0, 1],
+                       [0, 0, 1],
+                       [0, 0, 1]])
+    >>> hy = jnp.array([[1, 0, 0],
+                        [0, 1, 0],
+                        [0, 1, 0],
+                        [0, 0, 1],
+                        [1, 0, 0],
+                        [1, 0, 0],
+                        [0, 1, 0]])
+    >>> soft_comp_macro_f1(y, hy)
+    Array(0.56666666, dtype=float32)    
     """
 
     return 1 - soft_f1_score(y, hy).mean()

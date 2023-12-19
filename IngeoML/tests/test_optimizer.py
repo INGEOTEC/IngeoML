@@ -23,11 +23,13 @@ from IngeoML.utils import Batches, cross_entropy, soft_error, soft_comp_macro_f1
 
 
 def test_adam():
+    """Test adam optimizer"""
+
     @jax.jit
     def modelo(params, X):
         Y = X @ params['W'] + params['W0']
         return Y
-    
+
     @jax.jit
     def media_entropia_cruzada(params, X, y, pesos):
         hy = modelo(params, X)

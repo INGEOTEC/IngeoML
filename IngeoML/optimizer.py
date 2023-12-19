@@ -11,26 +11,75 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Callable
 from itertools import product
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.metrics import f1_score
 import numpy as np
 import jax
 import jax.numpy as jnp
-from jax import lax
 from jax import nn
 import optax
-from IngeoML.utils import Batches, balance_class_weigths, progress_bar, soft_error
+from IngeoML.utils import Batches, balance_class_weights, progress_bar, soft_error
 
 
-def adam(parameters, batches, objective, 
-         epochs: int=5, learning_rate: float=1e-2, 
+def adam(parameters: object, batches: Batches,
+         objective: Callable[[object, jnp.array, jnp.array], object],
+         epochs: int=5, learning_rate: float=1e-2,
          every_k_schedule: int=None,
          n_iter_no_change: int=jnp.inf,
-         validation=None, model=None,
-         return_evolution=None,
-         validation_score=None, **kwargs):
-    """adam optimizer"""
+         validation=None,
+         model: Callable[[object, jnp.array], jnp.array]=None,
+         return_evolution: bool=None,
+         validation_score=None,
+         **kwargs):
+    """adam optimizer
+    
+    :param parameters: Parameters to optimize.
+    :param batches: Batches used in the optimization.
+    :type batches: :py:class:`~IngeoML.utils.Batches`
+    :param objective: Objective function.
+    :param epochs: Number of epochs.
+    :param every_k_schedule: Update the parameters every k, default=jnp.inf.
+    :type every_k_schedule: int
+    :param validation: Validation set.
+    :param model: Model.
+    :param return_evolution: Whether to use the evolution the validation scores, default=None.
+    :type return_evolution: bool
+    :param validation_score: Function to compute the validation-set performance.
+
+    >>> import jax
+    >>> from sklearn.datasets import load_iris
+    >>> from sklearn.svm import LinearSVC
+    >>> from sklearn.preprocessing import OneHotEncoder
+    >>> from IngeoML.utils import Batches
+    >>> from IngeoML.utils import soft_BER
+    >>> from IngeoML.optimizer import adam
+    >>> def model(params, X):
+            Y = X @ params['W'] + params['W0']
+            return Y
+    >>> def objective(params, X, y, w):
+            hy = model(params, X)
+            hy = jax.nn.softmax(jnp.array(hy), axis=1)
+            return soft_BER(y, hy)
+    >>> model = jax.jit(model)
+    >>> X, y = load_iris(return_X_y=True)
+    >>> m = LinearSVC(dual='auto').fit(X, y)
+    >>> parameters = dict(W=m.coef_.T,
+                          W0=m.intercept_)
+    >>> encoder = OneHotEncoder(sparse_output=False).fit(y.reshape(-1, 1))
+    >>> y_enc = encoder.transform(y.reshape(-1, 1))
+    >>> batches = Batches()
+    >>> batches = [[jnp.array(X[idx]),
+                    jnp.array(y_enc[idx]), None]
+                   for idx in batches.split(y=y)]
+    >>> adam(parameters, batches, objective)
+    {'W': Array([[ 0.18344977,  0.05524644, -0.8504886],
+                 [ 0.4549369 , -0.9008946 , -0.9865761],
+                 [-0.8149536 ,  0.409234  ,  1.3809077],
+                 [-0.4335734 , -0.9606271 ,  1.8651136]], dtype=float32),
+     'W0': Array([ 0.10852419,  1.6873716 , -1.710725], dtype=float32)}    
+    """
 
     @jax.jit
     def update_finite(a, b):
@@ -60,7 +109,7 @@ def adam(parameters, batches, objective,
         if return_evolution:
             return value, evolution
         return value
-    
+
     optimizador = optax.adam(learning_rate=learning_rate, **kwargs)
     if validation_score is None:
         validation_score = lambda y, hy: f1_score(y, hy, average='macro')
@@ -98,11 +147,49 @@ def adam(parameters, batches, objective,
     return set_output(fit[-1])
 
 
-def classifier(parameters, model, X, y, batches=None, array=jnp.array,
-               class_weight: str='balanced', n_iter_no_change: int=jnp.inf,
+def classifier(parameters: object,
+               model: Callable[[object, jnp.array], jnp.array],
+               X, y,
+               batches: Batches=None,
+               array: Callable[[object],object]=jnp.array,
+               class_weight: str='balanced',
+               n_iter_no_change: int=jnp.inf,
                deviation=None, n_outputs: int=None, validation=None,
                **kwargs):
-    """Classifier optimized with optax"""
+    """Classifier optimized with optax
+
+    :param parameters: Parameters to optimize.
+    :param model: Model.
+    :param X: Independent variables.
+    :param y: Dependent variable.
+    :param batches: Batches used in the optimization.
+    :type batches: :py:class:`~IngeoML.utils.Batches`
+    :param array: Function to transform the independent variable.
+    :param class_weight: Element weigths.
+    :param n_iter_no_change: Number of iterations without improving the performance.
+    :type n_iter_no_change: int
+    :param deviation: Deviation function between the actual and predicted values.
+    :param n_output: Number of outputs.
+    :param validation: Validation set.
+
+    >>> import jax
+    >>> from sklearn.datasets import load_iris
+    >>> from sklearn.svm import LinearSVC
+    >>> from IngeoML.utils import soft_BER
+    >>> from IngeoML.optimizer import classifier
+    >>> def model(params, X):
+            Y = X @ params['W'] + params['W0']
+            return Y
+    >>> model = jax.jit(model)
+    >>> X, y = load_iris(return_X_y=True)
+    >>> m = LinearSVC(dual='auto').fit(X, y)
+    >>> parameters = dict(W=m.coef_.T,
+                          W0=m.intercept_)
+    >>> p, evolution = classifier(parameters, model, X, y,
+                                  n_iter_no_change=2,
+                                  return_evolution=True,
+                                  deviation=soft_BER)
+    """
 
     @jax.jit
     def deviation_model_binary(params, X, y, weigths):
@@ -140,7 +227,7 @@ def classifier(parameters, model, X, y, batches=None, array=jnp.array,
         batches_ = []
         if class_weight == 'balanced':
             splits = batches.split(y=y)
-            balance = balance_class_weigths
+            balance = balance_class_weights
         else:
             splits = batches.split(X)
             balance = lambda x: jnp.ones(x.shape[0]) / x.shape[0]
