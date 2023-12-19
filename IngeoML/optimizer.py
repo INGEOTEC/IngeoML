@@ -20,7 +20,7 @@ import jax.numpy as jnp
 from jax import lax
 from jax import nn
 import optax
-from IngeoML.utils import Batches, balance_class_weigths, progress_bar, soft_error
+from IngeoML.utils import Batches, balance_class_weights, progress_bar, soft_error
 
 
 def adam(parameters, batches, objective, 
@@ -140,7 +140,7 @@ def classifier(parameters, model, X, y, batches=None, array=jnp.array,
         batches_ = []
         if class_weight == 'balanced':
             splits = batches.split(y=y)
-            balance = balance_class_weigths
+            balance = balance_class_weights
         else:
             splits = batches.split(X)
             balance = lambda x: jnp.ones(x.shape[0]) / x.shape[0]

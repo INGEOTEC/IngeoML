@@ -214,8 +214,13 @@ class Batches:
         return output
 
 
-def balance_class_weigths(labels):
-    """Weights of the labels set to balance"""
+def balance_class_weights(labels):
+    """Weights of the labels set to balance
+    
+    >>> from IngeoML.utils import balance_class_weights
+    >>> balance_class_weights([1, 1, 2])
+    >>> 
+    """
     y_ = labels
     labels, cnts = np.unique(y_, return_counts=True)
     weigths = np.empty(y_.shape[0])

@@ -18,7 +18,7 @@ import jax
 from sklearn.datasets import load_iris, load_breast_cancer
 from sklearn.svm import LinearSVC
 from sklearn.preprocessing import OneHotEncoder
-from IngeoML.utils import Batches, balance_class_weigths, cross_entropy, soft_error, soft_recall, soft_BER, soft_precision, soft_f1_score, soft_comp_macro_f1
+from IngeoML.utils import Batches, balance_class_weights, cross_entropy, soft_error, soft_recall, soft_BER, soft_precision, soft_f1_score, soft_comp_macro_f1
 
 
 def test_batches():
@@ -51,10 +51,10 @@ def test_stratified():
     batch.split(y=y)
     
 
-def test_balance_class_weigths():
+def test_balance_class_weights():
     """Weights to have a balance in the labels"""
     y = np.r_[0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 2]
-    w = balance_class_weigths(y)
+    w = balance_class_weights(y)
     assert w.sum() == 1
     assert w.shape[0] == y.shape[0]
 
@@ -191,7 +191,7 @@ def test_soft_BER():
                     [0, 1, 0]])
     res = soft_BER(y, hy)
     assert jnp.fabs(res - 0.41666666) < 1e-6
-    w = balance_class_weigths(y.argmax(axis=1))
+    w = balance_class_weights(y.argmax(axis=1))
     r = soft_error(y, hy, w)
     assert np.fabs(r - res) < 1e-6
 
@@ -269,13 +269,13 @@ def test_soft_comp_macro_f1_grad():
     def modelo(params, X):
         Y = X @ params['W'] + params['W0']
         return Y
-    
+
     @jax.jit
     def deviation_model(params, X, y, weigths=None):
         hy = modelo(params, X)
         hy = jax.nn.softmax(hy, axis=-1)
         return soft_comp_macro_f1(y, hy)
-    
+
     X, y = load_iris(return_X_y=True)
     encoder = OneHotEncoder(sparse_output=False).fit(y.reshape(-1, 1))
     y_enc = encoder.transform(y.reshape(-1, 1))
@@ -284,4 +284,4 @@ def test_soft_comp_macro_f1_grad():
                       W0=m.intercept_)
     grad = jax.grad(deviation_model)
     p = grad(parameters, X, y_enc)
-    assert jnp.fabs(p['W']).sum() > 0    
+    assert jnp.fabs(p['W']).sum() > 0
