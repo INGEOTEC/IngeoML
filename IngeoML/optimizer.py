@@ -23,17 +23,18 @@ import optax
 from IngeoML.utils import Batches, balance_class_weights, progress_bar, soft_error
 
 
-def adam(parameters: object, batches: Batches,
-         objective: Callable[[object, jnp.array, jnp.array], object],
-         epochs: int=5, learning_rate: float=1e-2,
-         every_k_schedule: int=None,
-         n_iter_no_change: int=jnp.inf,
-         validation=None,
-         model: Callable[[object, jnp.array], jnp.array]=None,
-         return_evolution: bool=None,
-         validation_score=None,
-         **kwargs):
-    """adam optimizer
+def optimize(parameters: object, batches: Batches,
+             objective: Callable[[object, jnp.array, jnp.array], object],
+             epochs: int=5, learning_rate: float=1e-2,
+             every_k_schedule: int=None,
+             n_iter_no_change: int=jnp.inf,
+             validation=None,
+             model: Callable[[object, jnp.array], jnp.array]=None,
+             return_evolution: bool=None,
+             validation_score=None,
+             optimizer=None,
+             **kwargs):
+    """Optimize
     
     :param parameters: Parameters to optimize.
     :param batches: Batches used in the optimization.
@@ -54,7 +55,7 @@ def adam(parameters: object, batches: Batches,
     >>> from sklearn.preprocessing import OneHotEncoder
     >>> from IngeoML.utils import Batches
     >>> from IngeoML.utils import soft_BER
-    >>> from IngeoML.optimizer import adam
+    >>> from IngeoML.optimizer import optimize
     >>> def model(params, X):
             Y = X @ params['W'] + params['W0']
             return Y
@@ -73,7 +74,7 @@ def adam(parameters: object, batches: Batches,
     >>> batches = [[jnp.array(X[idx]),
                     jnp.array(y_enc[idx]), None]
                    for idx in batches.split(y=y)]
-    >>> adam(parameters, batches, objective)
+    >>> optimize(parameters, batches, objective)
     {'W': Array([[ 0.18344977,  0.05524644, -0.8504886],
                  [ 0.4549369 , -0.9008946 , -0.9865761],
                  [-0.8149536 ,  0.409234  ,  1.3809077],
@@ -110,7 +111,10 @@ def adam(parameters: object, batches: Batches,
             return value, evolution
         return value
 
-    optimizador = optax.adam(learning_rate=learning_rate, **kwargs)
+    if optimizer is None:
+        optimizador = optax.adam(learning_rate=learning_rate, **kwargs)
+    else:
+        optimizador = optimize(learning_rate=learning_rate, **kwargs)
     if validation_score is None:
         validation_score = lambda y, hy: f1_score(y, hy, average='macro')
     total = epochs * len(batches)        
@@ -268,7 +272,7 @@ def classifier(parameters: object,
         validation = batches_[index][:2]
         del batches_[index]
     objective, deviation = _objective(deviation)
-    return adam(parameters, batches_, objective,
-                n_iter_no_change=n_iter_no_change,
-                validation=validation, model=model,
-                **kwargs)
+    return optimize(parameters, batches_, objective,
+                    n_iter_no_change=n_iter_no_change,
+                    validation=validation, model=model,
+                    **kwargs)
