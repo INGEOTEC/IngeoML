@@ -18,12 +18,12 @@ from sklearn.model_selection import StratifiedShuffleSplit
 import numpy as np
 import jax.numpy as jnp
 import jax
-from IngeoML.optimizer import adam, classifier
+from IngeoML.optimizer import optimize, classifier
 from IngeoML.utils import Batches, cross_entropy, soft_error, soft_comp_macro_f1
 
 
-def test_adam():
-    """Test adam optimizer"""
+def test_optimize():
+    """Test optimize"""
 
     @jax.jit
     def modelo(params, X):
@@ -49,7 +49,7 @@ def test_adam():
     pesos = jnp.ones(batches[0][0].shape[0])
     for b in batches:
         b.append(pesos)
-    p = adam(parameters, batches, media_entropia_cruzada)
+    p = optimize(parameters, batches, media_entropia_cruzada)
     assert np.fabs(p['W'] - parameters['W']).sum() > 0
     fit1 = media_entropia_cruzada(parameters, *batches[0])
     fit2 = media_entropia_cruzada(p, *batches[0])    
