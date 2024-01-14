@@ -32,6 +32,7 @@ def optimize(parameters: object, batches: Batches,
              model: Callable[[object, jnp.array], jnp.array]=None,
              return_evolution: bool=None,
              validation_score=None,
+             discretize_val: bool= True,
              optimizer=None,
              **kwargs):
     """Optimize
@@ -88,8 +89,8 @@ def optimize(parameters: object, batches: Batches,
         return jnp.where(m, b, a)
 
     @jax.jit
-    def evaluacion(parameters, estado, X, y, weigths):
-        grads = objective_grad(parameters, X, y, weigths)
+    def evaluacion(parameters, estado, X, y, weights):
+        grads = objective_grad(parameters, X, y, weights)
         updates, estado = optimizador.update(grads, estado, parameters)
         parameters = optax.apply_updates(parameters, updates)
         return parameters, estado
@@ -99,11 +100,12 @@ def optimize(parameters: object, batches: Batches,
             return - jnp.inf
         X, y = validation
         hy = model(parameters, X)
-        if y.ndim == 1:
-            hy = np.where(hy.flatten() > 0, 1, 0)
-        else:
-            hy = hy.argmax(axis=1)
-            y = y.argmax(axis=1)
+        if discretize_val:
+            if y.ndim == 1:
+                hy = np.where(hy.flatten() > 0, 1, 0)
+            else:
+                hy = hy.argmax(axis=1)
+                y = y.argmax(axis=1)
         return validation_score(y, hy)
 
     def set_output(value):
@@ -130,9 +132,9 @@ def optimize(parameters: object, batches: Batches,
     evolution = [fit[:2]]
     i = 1
     n_iter_no_change = n_iter_no_change * every_k_schedule
-    for _, (X, y, weigths) in progress_bar(product(range(epochs),
+    for _, (X, y, weights) in progress_bar(product(range(epochs),
                                                    batches), total=total):
-        p, estado = evaluacion(parameters, estado, X, y, weigths)
+        p, estado = evaluacion(parameters, estado, X, y, weights)
         parameters = jax.tree_map(update_finite, parameters, p)
         if (i % every_k_schedule) == 0:
             comp = _validation_score()
@@ -169,7 +171,7 @@ def classifier(parameters: object,
     :param batches: Batches used in the optimization.
     :type batches: :py:class:`~IngeoML.utils.Batches`
     :param array: Function to transform the independent variable.
-    :param class_weight: Element weigths.
+    :param class_weight: Element weights.
     :param n_iter_no_change: Number of iterations without improving the performance.
     :type n_iter_no_change: int
     :param deviation: Deviation function between the actual and predicted values.
@@ -196,19 +198,19 @@ def classifier(parameters: object,
     """
 
     @jax.jit
-    def deviation_model_binary(params, X, y, weigths):
+    def deviation_model_binary(params, X, y, weights):
         hy = model(params, X)
         hy = nn.sigmoid(hy)
         hy = hy.flatten()
         y_ = jnp.vstack((y, 1 - y)).T
         hy_ = jnp.vstack((hy, 1 - hy)).T        
-        return deviation(y_, hy_, weigths)
+        return deviation(y_, hy_, weights)
 
     @jax.jit
-    def deviation_model(params, X, y, weigths):
+    def deviation_model(params, X, y, weights):
         hy = model(params, X)
         hy = nn.softmax(hy, axis=-1)
-        return deviation(y, hy, weigths)
+        return deviation(y, hy, weights)
 
     def encode(y, n_outputs, validation):
         if n_outputs == 1:

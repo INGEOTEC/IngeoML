@@ -17,6 +17,7 @@ from sklearn.preprocessing import OneHotEncoder
 from sklearn.model_selection import StratifiedShuffleSplit
 import numpy as np
 import jax.numpy as jnp
+from jax import nn
 import jax
 from IngeoML.optimizer import optimize, classifier
 from IngeoML.utils import Batches, cross_entropy, soft_error, soft_comp_macro_f1
@@ -111,6 +112,54 @@ def test_classifier_early_stopping():
                     n_iter_no_change=2,
                     every_k_schedule=2,
                     learning_rate=1e-1)
+    
+
+def test_regression():
+    """Test regression"""
+    from scipy.stats import pearsonr
+
+    def validation_score(y, hy):
+        cnt = (hy == 0).sum() + (hy == 1).sum()
+        assert cnt < hy.shape[0]
+        return pearsonr(y, hy).statistic
+
+    @jax.jit
+    def modelo(params, X):
+        Y = X @ params['W'] + params['W0']
+        return nn.sigmoid(Y).flatten()
+    
+    def objective(params, X, y, weights):
+        hy = modelo(params, X)
+        return - jnp.nansum(y * jnp.log(hy))
+
+    X, y = load_breast_cancer(return_X_y=True)
+    m = LinearSVC(dual='auto').fit(X, y)
+    params = dict(W=jnp.array(m.coef_.T),
+                  W0=jnp.array(m.intercept_))
+    batches = Batches()
+    a = jnp.array
+    batches = [[a(X[idx]), a(y[idx])]
+               for idx in batches.split(X)]
+    pesos = jnp.ones(batches[0][0].shape[0])
+    for b in batches:
+        b.append(pesos)
+    # hy = modelo(params, X)
+    # pre = pearsonr(y, hy).statistic
+    p, evol = optimize(params, batches[1:], objective,
+                       validation=batches[0][:2],
+                       every_k_schedule=3,
+                       epochs=50,
+                       learning_rate=1e-3,
+                       n_iter_no_change=5,
+                       validation_score=validation_score,
+                       discretize_val=False,
+                       return_evolution=True,
+                       model=modelo)    
+
+    # hy = modelo(p, X)
+    # despues = pearsonr(y, hy).statistic
+    # assert evol is None
+
     
 
 def test_classifier_deviation():
