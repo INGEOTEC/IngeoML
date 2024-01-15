@@ -20,4 +20,4 @@ Optimizer
 --------------------------------------------
 
 .. automodule:: IngeoML.optimizer
-    :members: optimize, classifier
+    :members: optimize, classifier, regression, estimator

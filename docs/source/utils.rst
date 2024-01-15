@@ -23,4 +23,4 @@ Utils
     :members: split, blocks, distribution
 
 .. automodule:: IngeoML.utils
-    :members: balance_class_weights, cross_entropy, soft_error, soft_BER, soft_recall, soft_precision, soft_f1_score, soft_comp_macro_f1
+    :members: balance_class_weights, cross_entropy, soft_error, soft_BER, soft_recall, soft_precision, soft_f1_score, soft_comp_macro_f1, cos_similarity, cos_distance

@@ -13,12 +13,14 @@
 # limitations under the License.
 from sklearn.datasets import load_iris, load_breast_cancer
 from sklearn.svm import LinearSVC
+from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.model_selection import StratifiedShuffleSplit
 import numpy as np
 import jax.numpy as jnp
+from jax import nn
 import jax
-from IngeoML.optimizer import optimize, classifier
+from IngeoML.optimizer import optimize, classifier, regression
 from IngeoML.utils import Batches, cross_entropy, soft_error, soft_comp_macro_f1
 
 
@@ -82,6 +84,25 @@ def test_classifier():
     assert np.fabs(diff).sum() > 0
 
 
+def test_regression():
+    """Test estimator using a regression"""
+    @jax.jit
+    def modelo(params, X):
+        Y = X @ params['W'] + params['W0']
+        return nn.sigmoid(Y).flatten()
+
+    X, y = load_breast_cancer(return_X_y=True)
+    m = LinearRegression().fit(X, y)
+    parameters = dict(W=jnp.array(m.coef_.T),
+                      W0=jnp.array(m.intercept_))
+    
+    p2, evol = regression(parameters, modelo, X, y,
+                          return_evolution=True)         
+    assert len(evol) > 5
+    diff = p2['W0'] - parameters['W0']
+    assert np.fabs(diff).sum() > 0
+
+
 def test_classifier_early_stopping():
     """Test early stopping"""
 
@@ -113,7 +134,57 @@ def test_classifier_early_stopping():
                     learning_rate=1e-1)
     
 
+def test_regression():
+    """Test regression"""
+    from scipy.stats import pearsonr
+    from sklearn.linear_model import LinearRegression
+
+    def validation_score(y, hy):
+        cnt = (hy == 0).sum() + (hy == 1).sum()
+        assert cnt < hy.shape[0]
+        return 1 / - jnp.nansum(y * jnp.log(hy))
+
+    @jax.jit
+    def modelo(params, X):
+        Y = X @ params['W'] + params['W0']
+        return nn.sigmoid(Y).flatten()
+    
+    def objective(params, X, y, weights):
+        hy = modelo(params, X)
+        return - jnp.nansum(y * jnp.log(hy))
+
+    X, y = load_breast_cancer(return_X_y=True)
+    m = LinearRegression().fit(X, y)
+    params = dict(W=jnp.array(m.coef_.T),
+                  W0=jnp.array(m.intercept_))
+    batches = Batches()
+    a = jnp.array
+    batches = [[a(X[idx]), a(y[idx])]
+               for idx in batches.split(X)]
+    pesos = jnp.ones(batches[0][0].shape[0])
+    for b in batches:
+        b.append(pesos)
+    hy = modelo(params, X)
+    pre = 1 / - jnp.nansum(y * jnp.log(hy))
+    p, evol = optimize(params, batches[1:], objective,
+                       validation=batches[0][:2],
+                       every_k_schedule=3,
+                       epochs=50,
+                       learning_rate=1e-3,
+                       n_iter_no_change=5,
+                       validation_score=validation_score,
+                       discretize_val=False,
+                       return_evolution=True,
+                       model=modelo)    
+
+    hy = modelo(p, X)
+    despues = 1 / - jnp.nansum(y * jnp.log(hy))
+    assert despues > pre
+    # assert evol is None
+
+
 def test_classifier_deviation():
+    """Test classifier deviation"""
     @jax.jit
     def modelo(params, X):
         Y = X @ params['W'] + params['W0']
@@ -131,6 +202,7 @@ def test_classifier_deviation():
     
 
 def test_classifier_error():
+    """Test classifier error"""
     @jax.jit
     def modelo(params, X):
         Y = X @ params['W'] + params['W0']
