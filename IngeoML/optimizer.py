@@ -20,7 +20,7 @@ import jax
 import jax.numpy as jnp
 from jax import nn
 import optax
-from IngeoML.utils import Batches, balance_class_weights, progress_bar, soft_error
+from IngeoML.utils import Batches, balance_class_weights, progress_bar, soft_error, cos_distance, cos_similarity
 
 
 def optimize(parameters: object, batches: Batches,
@@ -42,6 +42,8 @@ def optimize(parameters: object, batches: Batches,
     :type batches: :py:class:`~IngeoML.utils.Batches`
     :param objective: Objective function.
     :param epochs: Number of epochs.
+    :param learning_rate: Learning rate, default=1e-2.
+    :type learning_rate: float
     :param every_k_schedule: Update the parameters every k, default=jnp.inf.
     :type every_k_schedule: int
     :param validation: Validation set.
@@ -49,6 +51,9 @@ def optimize(parameters: object, batches: Batches,
     :param return_evolution: Whether to use the evolution the validation scores, default=None.
     :type return_evolution: bool
     :param validation_score: Function to compute the validation-set performance.
+    :param discretize_val: whether to transform one-hot encoding to labels
+    :type discretize_val: True
+    :param optimizer: Optimizer default optax.adam. 
 
     >>> import jax
     >>> from sklearn.datasets import load_iris
@@ -153,16 +158,18 @@ def optimize(parameters: object, batches: Batches,
     return set_output(fit[-1])
 
 
-def classifier(parameters: object,
-               model: Callable[[object, jnp.array], jnp.array],
-               X, y,
-               batches: Batches=None,
-               array: Callable[[object],object]=jnp.array,
-               class_weight: str='balanced',
-               n_iter_no_change: int=jnp.inf,
-               deviation=None, n_outputs: int=None, validation=None,
-               **kwargs):
-    """Classifier optimized with optax
+def estimator(parameters: object,
+              model: Callable[[object, jnp.array], jnp.array],
+              X, y,
+              batches: Batches=None,
+              array: Callable[[object],object]=jnp.array,
+              class_weight: str='balanced',
+              n_iter_no_change: int=jnp.inf,
+              deviation=None, n_outputs: int=None, validation=None,
+              discretize_val: bool= True,
+              classifier: bool=True,
+              **kwargs):
+    """Estimator optimized with optax
 
     :param parameters: Parameters to optimize.
     :param model: Model.
@@ -177,12 +184,16 @@ def classifier(parameters: object,
     :param deviation: Deviation function between the actual and predicted values.
     :param n_output: Number of outputs.
     :param validation: Validation set.
+    :param discretize_val: whether to transform one-hot encoding to labels
+    :type discretize_val: bool
+    :param classifier: The estimator is classifier, default=True.
+    :type classifier: bool
 
     >>> import jax
     >>> from sklearn.datasets import load_iris
     >>> from sklearn.svm import LinearSVC
     >>> from IngeoML.utils import soft_BER
-    >>> from IngeoML.optimizer import classifier
+    >>> from IngeoML.optimizer import estimator
     >>> def model(params, X):
             Y = X @ params['W'] + params['W0']
             return Y
@@ -191,7 +202,7 @@ def classifier(parameters: object,
     >>> m = LinearSVC(dual='auto').fit(X, y)
     >>> parameters = dict(W=m.coef_.T,
                           W0=m.intercept_)
-    >>> p, evolution = classifier(parameters, model, X, y,
+    >>> p, evolution = estimator(parameters, model, X, y,
                                   n_iter_no_change=2,
                                   return_evolution=True,
                                   deviation=soft_BER)
@@ -210,6 +221,11 @@ def classifier(parameters: object,
     def deviation_model(params, X, y, weights):
         hy = model(params, X)
         hy = nn.softmax(hy, axis=-1)
+        return deviation(y, hy, weights)
+    
+    @jax.jit
+    def deviation_regression(params, X, y, weights):
+        hy = model(params, X)
         return deviation(y, hy, weights)
 
     def encode(y, n_outputs, validation):
@@ -231,7 +247,7 @@ def classifier(parameters: object,
     def create_batches(batches):
         batches = Batches() if batches is None else batches
         batches_ = []
-        if class_weight == 'balanced':
+        if classifier and class_weight == 'balanced':
             splits = batches.split(y=y)
             balance = balance_class_weights
         else:
@@ -255,6 +271,8 @@ def classifier(parameters: object,
         return validation, X, y_enc, y
 
     def _objective(deviation):
+        if not classifier:
+            return deviation_regression, deviation
         if deviation is None:
             deviation = soft_error
         if n_outputs == 1:
@@ -265,7 +283,10 @@ def classifier(parameters: object,
 
     if n_outputs is None:
         n_outputs = model(parameters, array(X[:1])).shape[-1]
-    y_enc = encode(y, n_outputs, validation)
+    if classifier:
+        y_enc = encode(y, n_outputs, validation)
+    else:
+        y_enc = y
     validation, X, y_enc, y = _validation(validation, X, y_enc, y)
     batches_, splits = create_batches(batches)
     if n_iter_no_change < jnp.inf and validation is None:
@@ -277,4 +298,120 @@ def classifier(parameters: object,
     return optimize(parameters, batches_, objective,
                     n_iter_no_change=n_iter_no_change,
                     validation=validation, model=model,
+                    discretize_val=discretize_val,
                     **kwargs)
+
+
+def classifier(parameters: object,
+               model: Callable[[object, jnp.array], jnp.array],
+               X, y,
+               batches: Batches=None,
+               array: Callable[[object],object]=jnp.array,
+               class_weight: str='balanced',
+               n_iter_no_change: int=jnp.inf,
+               deviation=None, n_outputs: int=None, validation=None,
+               discretize_val: bool= True,
+               **kwargs):
+    """Classifier optimized with optax
+
+    :param parameters: Parameters to optimize.
+    :param model: Model.
+    :param X: Independent variables.
+    :param y: Dependent variable.
+    :param batches: Batches used in the optimization.
+    :type batches: :py:class:`~IngeoML.utils.Batches`
+    :param array: Function to transform the independent variable.
+    :param class_weight: Element weights.
+    :param n_iter_no_change: Number of iterations without improving the performance.
+    :type n_iter_no_change: int
+    :param deviation: Deviation function between the actual and predicted values.
+    :param n_output: Number of outputs.
+    :param validation: Validation set.
+    :param discretize_val: whether to transform one-hot encoding to labels
+    :type discretize_val: True    
+
+    >>> import jax
+    >>> from sklearn.datasets import load_iris
+    >>> from sklearn.svm import LinearSVC
+    >>> from IngeoML.utils import soft_BER
+    >>> from IngeoML.optimizer import classifier
+    >>> def model(params, X):
+            Y = X @ params['W'] + params['W0']
+            return Y
+    >>> model = jax.jit(model)
+    >>> X, y = load_iris(return_X_y=True)
+    >>> m = LinearSVC(dual='auto').fit(X, y)
+    >>> parameters = dict(W=m.coef_.T,
+                          W0=m.intercept_)
+    >>> p, evolution = classifier(parameters, model, X, y,
+                                  n_iter_no_change=2,
+                                  return_evolution=True,
+                                  deviation=soft_BER)
+    """
+
+    return estimator(parameters, model, X, y, batches=batches,
+                     array=array, class_weight=class_weight,
+                     n_iter_no_change=n_iter_no_change,
+                     deviation=deviation, n_outputs=n_outputs,
+                     validation=validation, discretize_val=discretize_val,
+                     classifier=True, **kwargs)
+
+
+def regression(parameters: object,
+               model: Callable[[object, jnp.array], jnp.array],
+               X, y,
+               deviation=cos_distance,
+               discretize_val=False,
+               classifier=False,
+               validation_score=cos_similarity,
+               every_k_schedule=4,
+               epochs=100, learning_rate=1e-4,
+               n_iter_no_change=5,
+               **kwargs):
+    """Regression optimized with optax
+
+    :param parameters: Parameters to optimize.
+    :param model: Model.
+    :param X: Independent variables.
+    :param y: Dependent variable.
+    :param deviation: Deviation function between the actual and predicted values, default=cos_distance.
+    :param discretize_val: whether to transform one-hot encoding to labels
+    :type discretize_val: True
+    :param classifier: The estimator is classifier, default=False.
+    :type classifier: bool
+    :param validation_score: Function to compute the validation-set performance.
+    :param every_k_schedule: Update the parameters every k, default=4.
+    :type every_k_schedule: int
+    :param epochs: Number of epochs.
+    :param learning_rate: Learning rate, default=1e-4.
+    :type learning_rate: float
+    :param n_iter_no_change: Number of iterations without improving the performance, default=5.
+    :type n_iter_no_change: int
+
+    >>> import jax
+    >>> import jax.nn as nn
+    >>> from sklearn.datasets import load_breast_cancer
+    >>> from sklearn.linear_model import LinearRegression
+    >>> from IngeoML.optimizer import regression
+    >>> def model(params, X):
+            Y = X @ params['W'] + params['W0']
+            return nn.sigmoid(Y).flatten()
+    >>> model = jax.jit(model)
+    >>> X, y = load_breast_cancer(return_X_y=True)
+    >>> m = LinearRegression().fit(X, y)
+    >>> parameters = dict(W=m.coef_.T,
+                          W0=m.intercept_)
+    >>> p, evolution = regression(parameters, model, X, y,
+                                  return_evolution=True)
+    """    
+    
+    return estimator(parameters, model, X, y,
+                     deviation=deviation,
+                     discretize_val=discretize_val,
+                     classifier=classifier,
+                     validation_score=validation_score,
+                     every_k_schedule=every_k_schedule,
+                     epochs=epochs,
+                     learning_rate=learning_rate,
+                     n_iter_no_change=n_iter_no_change,
+                     **kwargs) 

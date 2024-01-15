@@ -17,8 +17,9 @@ from jax import nn
 import jax
 from sklearn.datasets import load_iris, load_breast_cancer
 from sklearn.svm import LinearSVC
+from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import OneHotEncoder
-from IngeoML.utils import Batches, balance_class_weights, cross_entropy, soft_error, soft_recall, soft_BER, soft_precision, soft_f1_score, soft_comp_macro_f1
+from IngeoML.utils import Batches, balance_class_weights, cross_entropy, soft_error, soft_recall, soft_BER, soft_precision, soft_f1_score, soft_comp_macro_f1, cos_distance
 
 
 def test_batches():
@@ -135,10 +136,10 @@ def test_soft_error_grad():
         return Y
     
     @jax.jit
-    def deviation_model(params, X, y, weigths):
+    def deviation_model(params, X, y, weights):
         hy = modelo(params, X)
         hy = jax.nn.softmax(hy, axis=-1)
-        return soft_error(y, hy, weigths)        
+        return soft_error(y, hy, weights)        
     
     X, y = load_iris(return_X_y=True)
     encoder = OneHotEncoder(sparse_output=False).fit(y.reshape(-1, 1))
@@ -205,10 +206,10 @@ def test_soft_BER_grad():
         return Y
     
     @jax.jit
-    def deviation_model(params, X, y, weigths=None):
+    def deviation_model(params, X, y, weights=None):
         hy = modelo(params, X)
         hy = jax.nn.softmax(hy, axis=-1)
-        return soft_BER(y, hy, weigths=weigths)
+        return soft_BER(y, hy, weights=weights)
     
     X, y = load_iris(return_X_y=True)
     encoder = OneHotEncoder(sparse_output=False).fit(y.reshape(-1, 1))
@@ -271,7 +272,7 @@ def test_soft_comp_macro_f1_grad():
         return Y
 
     @jax.jit
-    def deviation_model(params, X, y, weigths=None):
+    def deviation_model(params, X, y, weights=None):
         hy = modelo(params, X)
         hy = jax.nn.softmax(hy, axis=-1)
         return soft_comp_macro_f1(y, hy)
@@ -285,3 +286,43 @@ def test_soft_comp_macro_f1_grad():
     grad = jax.grad(deviation_model)
     p = grad(parameters, X, y_enc)
     assert jnp.fabs(p['W']).sum() > 0
+
+
+def test_cos_distance():
+    """Test cos distance"""
+
+    y = jnp.array([1, 0, 1])
+    hy = jnp.array([0.9, 0, 0.8])
+    dis = cos_distance(y, hy, None)
+    hy = jnp.array([1, 0, 1])
+    dis_c = cos_distance(y, hy, None)
+    assert dis > dis_c
+    assert np.all(dis_c < 1e-6)
+    hy = jnp.array([0, 1, 0])
+    dis = cos_distance(y, hy, None)
+    assert np.all(dis - 1 < 1e-6)
+
+
+def test_cos_distance_grad():
+    """Test cos_distance grad"""
+
+    @jax.jit
+    def modelo(params, X):
+        Y = X @ params['W'] + params['W0']
+        return nn.sigmoid(Y).flatten()
+    
+    def objective(params, X, y):
+        hy = modelo(params, X)
+        return cos_distance(y, hy, None)
+    
+    X, y = load_breast_cancer(return_X_y=True)
+    m = LinearRegression().fit(X, y)
+    params = dict(W=jnp.array(m.coef_.T),
+                  W0=jnp.array(m.intercept_))
+    grad = jax.grad(objective)
+    p = grad(params, X, y)
+    assert jnp.fabs(p['W']).sum() > 0
+
+
+
+
