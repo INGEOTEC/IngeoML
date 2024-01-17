@@ -60,28 +60,35 @@ def test_optimize():
 
 def test_classifier():
     """Classifier optimize with jax"""
+    from sklearn.metrics import recall_score
+    from sklearn.datasets import load_wine
+
     @jax.jit
     def modelo(params, X):
         Y = X @ params['W'] + params['W0']
         return Y
 
-    X, y = load_iris(return_X_y=True)
-    m = LinearSVC(dual='auto').fit(X, y)
+    X, y = load_wine(return_X_y=True)
+    index = np.arange(X.shape[0])
+    np.random.shuffle(index)
+    m = LinearSVC(dual='auto').fit(X[index[:100]], y[:100])
     parameters = dict(W=jnp.array(m.coef_.T),
                       W0=jnp.array(m.intercept_))
-    p = classifier(parameters, modelo, X, y,
-                   deviation=cross_entropy)
-    assert np.fabs(p['W'] - parameters['W']).sum() > 0
-    diff = p['W0'] - parameters['W0']
-    assert np.fabs(diff).sum() > 0
+    p, evol = classifier(parameters, modelo, X, y,
+                         # learning_rate=1e-3,
+                         return_evolution=True)
+    evol = np.array([x[1] for x in evol])
+    assert np.any(np.diff(evol) != 0)
     X, y = load_breast_cancer(return_X_y=True)
-    m = LinearSVC(dual='auto').fit(X, y)
+    index = np.arange(X.shape[0])
+    np.random.shuffle(index)    
+    m = LinearSVC(dual='auto').fit(X[index[:400]], y[index[:400]])
     parameters = dict(W=jnp.array(m.coef_.T),
                       W0=jnp.array(m.intercept_))
-    p2 = classifier(parameters, modelo, X, y,
-                    deviation=cross_entropy)
-    diff = p2['W0'] - parameters['W0']
-    assert np.fabs(diff).sum() > 0
+    p2, evol = classifier(parameters, modelo, X, y,
+                          return_evolution=True)
+    evol = np.array([x[1] for x in evol])
+    assert np.any(np.diff(evol) != 0)
 
 
 def test_regression():

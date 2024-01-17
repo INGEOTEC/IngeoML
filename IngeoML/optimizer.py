@@ -15,12 +15,13 @@ from typing import Callable
 from itertools import product
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.metrics import f1_score
+from sklearn.model_selection import ShuffleSplit, StratifiedShuffleSplit
 import numpy as np
 import jax
 import jax.numpy as jnp
 from jax import nn
 import optax
-from IngeoML.utils import Batches, balance_class_weights, progress_bar, soft_error, cos_distance, cos_similarity
+from IngeoML.utils import Batches, balance_class_weights, progress_bar, soft_BER, cos_distance, cos_similarity
 
 
 def optimize(parameters: object, batches: Batches,
@@ -183,7 +184,7 @@ def estimator(parameters: object,
     :type n_iter_no_change: int
     :param deviation: Deviation function between the actual and predicted values.
     :param n_output: Number of outputs.
-    :param validation: Validation set.
+    :param validation: Validation set, if None it is created with :py:class:`~sklearn.model_selection.ShuffleSplit` or :py:class:`~sklearn.model_selection.StratifiedShuffleSplit`
     :param discretize_val: whether to transform one-hot encoding to labels
     :type discretize_val: bool
     :param classifier: The estimator is classifier, default=True.
@@ -192,7 +193,6 @@ def estimator(parameters: object,
     >>> import jax
     >>> from sklearn.datasets import load_iris
     >>> from sklearn.svm import LinearSVC
-    >>> from IngeoML.utils import soft_BER
     >>> from IngeoML.optimizer import estimator
     >>> def model(params, X):
             Y = X @ params['W'] + params['W0']
@@ -203,9 +203,7 @@ def estimator(parameters: object,
     >>> parameters = dict(W=m.coef_.T,
                           W0=m.intercept_)
     >>> p, evolution = estimator(parameters, model, X, y,
-                                  n_iter_no_change=2,
-                                  return_evolution=True,
-                                  deviation=soft_BER)
+                                 return_evolution=True)
     """
 
     @jax.jit
@@ -245,7 +243,9 @@ def estimator(parameters: object,
         return y_enc
 
     def create_batches(batches):
-        batches = Batches() if batches is None else batches
+        if batches is None:
+            batches = Batches(size=512 if X.shape[0] >= 2048 else 256,
+                              random_state=0)
         batches_ = []
         if classifier and class_weight == 'balanced':
             splits = batches.split(y=y)
@@ -274,13 +274,23 @@ def estimator(parameters: object,
         if not classifier:
             return deviation_regression, deviation
         if deviation is None:
-            deviation = soft_error
+            deviation = soft_BER
         if n_outputs == 1:
             objective = deviation_model_binary
         else:
             objective = deviation_model
         return objective, deviation
 
+    if validation is None:
+        cnt = X.shape[0]
+        if cnt < 2048:
+            test_size = 0.2
+        else:
+            test_size = 512
+        if classifier and class_weight == 'balanced':
+            validation = StratifiedShuffleSplit(n_splits=1, test_size=test_size)
+        else:
+            validation = ShuffleSplit(n_splits=1, test_size=test_size)
     if n_outputs is None:
         n_outputs = model(parameters, array(X[:1])).shape[-1]
     if classifier:
@@ -308,9 +318,11 @@ def classifier(parameters: object,
                batches: Batches=None,
                array: Callable[[object],object]=jnp.array,
                class_weight: str='balanced',
-               n_iter_no_change: int=jnp.inf,
                deviation=None, n_outputs: int=None, validation=None,
                discretize_val: bool= True,
+               every_k_schedule=4,
+               epochs=100, learning_rate=1e-4,
+               n_iter_no_change=5,
                **kwargs):
     """Classifier optimized with optax
 
@@ -322,18 +334,23 @@ def classifier(parameters: object,
     :type batches: :py:class:`~IngeoML.utils.Batches`
     :param array: Function to transform the independent variable.
     :param class_weight: Element weights.
-    :param n_iter_no_change: Number of iterations without improving the performance.
-    :type n_iter_no_change: int
     :param deviation: Deviation function between the actual and predicted values.
     :param n_output: Number of outputs.
     :param validation: Validation set.
     :param discretize_val: whether to transform one-hot encoding to labels
-    :type discretize_val: True    
+    :type discretize_val: bool
+    :param every_k_schedule: Update the parameters every k, default=4.
+    :type every_k_schedule: int
+    :param epochs: Number of epochs.
+    :param learning_rate: Learning rate, default=1e-4.
+    :type learning_rate: float
+    :param n_iter_no_change: Number of iterations without improving the performance, default=5.
+    :type n_iter_no_change: int
+
 
     >>> import jax
     >>> from sklearn.datasets import load_iris
     >>> from sklearn.svm import LinearSVC
-    >>> from IngeoML.utils import soft_BER
     >>> from IngeoML.optimizer import classifier
     >>> def model(params, X):
             Y = X @ params['W'] + params['W0']
@@ -344,17 +361,17 @@ def classifier(parameters: object,
     >>> parameters = dict(W=m.coef_.T,
                           W0=m.intercept_)
     >>> p, evolution = classifier(parameters, model, X, y,
-                                  n_iter_no_change=2,
-                                  return_evolution=True,
-                                  deviation=soft_BER)
+                                  return_evolution=True)
     """
 
     return estimator(parameters, model, X, y, batches=batches,
                      array=array, class_weight=class_weight,
-                     n_iter_no_change=n_iter_no_change,
                      deviation=deviation, n_outputs=n_outputs,
                      validation=validation, discretize_val=discretize_val,
-                     classifier=True, **kwargs)
+                     every_k_schedule=every_k_schedule,
+                     epochs=epochs, learning_rate=learning_rate,
+                     n_iter_no_change=n_iter_no_change,
+                     **kwargs)
 
 
 def regression(parameters: object,
