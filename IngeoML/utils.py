@@ -473,3 +473,68 @@ def cos_distance(y: jnp.array, hy: jnp.array, weights=None) -> jnp.array:
     Array(1., dtype=float32)    
     """
     return 1 - jnp.fabs(cos_similarity(y, hy))
+
+
+@jax.jit
+def pearson(y: jnp.array, hy: jnp.array, weights=None) -> jnp.array:
+    """Pearson correlation
+
+    :param y: Gold standard
+    :param hy: Predictions
+    :param weights: Weights are not used
+
+    >>> import jax.numpy as jnp
+    >>> from IngeoML.utils import pearson
+    >>> y = jnp.array([1, 0, 1])
+    >>> hy = jnp.array([0.9, 0.1, 0.8])
+    >>> pearson(y, hy, None)
+    Array(0.9933992, dtype=float32)    
+    """
+    
+    mu_y = y.mean()
+    mu_hy = hy.mean()
+    frst = (y - mu_y)
+    scnd = (hy - mu_hy)
+    num = (frst * scnd).sum()
+    den = jnp.sqrt((frst**2).sum()) * jnp.sqrt((scnd**2).sum())
+    return num / den
+
+
+@jax.jit
+def pearson_distance(y: jnp.array, hy: jnp.array, weights=None) -> jnp.array:
+    """Pearson correlation
+
+    :param y: Gold standard
+    :param hy: Predictions
+    :param weights: Weights are not used
+
+    >>> import jax.numpy as jnp
+    >>> from IngeoML.utils import pearson_distance
+    >>> y = jnp.array([1, 0, 1])
+    >>> hy = jnp.array([0.9, 0.1, 0.8])
+    >>> pearson_distance(y, hy, None)
+    Array(0.0033004, dtype=float32)
+    """
+    
+    value = pearson(y, hy)
+    return -(value - 1) / 2
+
+
+@jax.jit
+def pearson_similarity(y: jnp.array, hy: jnp.array, weights=None) -> jnp.array:
+    """Pearson correlation
+
+    :param y: Gold standard
+    :param hy: Predictions
+    :param weights: Weights are not used
+
+    >>> import jax.numpy as jnp
+    >>> from IngeoML.utils import pearson_distance
+    >>> y = jnp.array([1, 0, 1])
+    >>> hy = jnp.array([0.9, 0.1, 0.8])
+    >>> pearson_distance(y, hy, None)
+    Array(0.0033004, dtype=float32)
+    """
+    
+    value = pearson(y, hy) + 1
+    return value / 2
