@@ -19,7 +19,7 @@ from sklearn.datasets import load_iris, load_breast_cancer
 from sklearn.svm import LinearSVC
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import OneHotEncoder
-from IngeoML.utils import Batches, balance_class_weights, cross_entropy, soft_error, soft_recall, soft_BER, soft_precision, soft_f1_score, soft_comp_macro_f1, cos_distance
+from IngeoML.utils import Batches, balance_class_weights, cross_entropy, soft_error, soft_recall, soft_BER, soft_precision, soft_f1_score, soft_comp_macro_f1, cos_distance, pearson, pearson_distance, pearson_similarity
 
 
 def test_batches():
@@ -324,5 +324,44 @@ def test_cos_distance_grad():
     assert jnp.fabs(p['W']).sum() > 0
 
 
+def test_pearson():
+    """Test cos distance"""
+
+    from scipy.stats import pearsonr
+    y = jnp.array([1, 0, 1])
+    hy = jnp.array([0.9, 0, 0.8])
+
+    dis = pearson(y, hy, None)
+    value = pearsonr(y, hy).statistic
+    diff = value - dis
+    assert jnp.fabs(diff) < 1e-7
+    value2 = pearson_similarity(y, hy)
+    assert value2 > value 
+    # hy = jnp.array([1, 0, 1])
+    # dis_c = cos_distance(y, hy, None)
+    # assert dis > dis_c
+    # assert np.all(dis_c < 1e-6)
+    # hy = jnp.array([0, 1, 0])
+    # dis = cos_distance(y, hy, None)
+    # assert np.all(dis - 1 < 1e-6)
 
 
+def test_pearson_distance_grad():
+    """Test pearson_distance grad"""
+
+    @jax.jit
+    def modelo(params, X):
+        Y = X @ params['W'] + params['W0']
+        return nn.sigmoid(Y).flatten()
+    
+    def objective(params, X, y):
+        hy = modelo(params, X)
+        return pearson_distance(y, hy, None)
+    
+    X, y = load_breast_cancer(return_X_y=True)
+    m = LinearRegression().fit(X, y)
+    params = dict(W=jnp.array(m.coef_.T),
+                  W0=jnp.array(m.intercept_))
+    grad = jax.grad(objective)
+    p = grad(params, X, y)
+    assert jnp.fabs(p['W']).sum() > 0
