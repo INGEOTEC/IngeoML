@@ -16,10 +16,12 @@ from itertools import product
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.metrics import f1_score
 from sklearn.model_selection import ShuffleSplit, StratifiedShuffleSplit
+from scipy.sparse import spmatrix
 import numpy as np
 import jax
 import jax.numpy as jnp
 from jax import nn
+from jax.experimental.sparse import BCSR
 import optax
 from IngeoML.utils import Batches, balance_class_weights, progress_bar, soft_BER, cos_distance, cos_similarity
 
@@ -163,7 +165,6 @@ def estimator(parameters: object,
               model: Callable[[object, jnp.array], jnp.array],
               X, y,
               batches: Batches=None,
-              array: Callable[[object],object]=jnp.array,
               class_weight: str='balanced',
               n_iter_no_change: int=jnp.inf,
               deviation=None, n_outputs: int=None, validation=None,
@@ -179,7 +180,6 @@ def estimator(parameters: object,
     :param y: Dependent variable.
     :param batches: Batches used in the optimization.
     :type batches: :py:class:`~IngeoML.utils.Batches`
-    :param array: Function to transform the independent variable.
     :param class_weight: Element weights.
     :param n_iter_no_change: Number of iterations without improving the performance.
     :type n_iter_no_change: int
@@ -244,6 +244,11 @@ def estimator(parameters: object,
                 _ = validation[1]
                 validation[1] = encoder.transform(_.reshape(-1, 1))
         return y_enc
+    
+    def array(data):
+        if isinstance(data, spmatrix):
+            return BCSR.from_scipy_sparse(data)
+        return jnp.array(data)
 
     def create_batches(batches):
         if batches is None:
@@ -322,7 +327,6 @@ def classifier(parameters: object,
                model: Callable[[object, jnp.array], jnp.array],
                X, y,
                batches: Batches=None,
-               array: Callable[[object],object]=jnp.array,
                class_weight: str='balanced',
                deviation=None, n_outputs: int=None, validation=None,
                discretize_val: bool= True,
@@ -338,7 +342,6 @@ def classifier(parameters: object,
     :param y: Dependent variable.
     :param batches: Batches used in the optimization.
     :type batches: :py:class:`~IngeoML.utils.Batches`
-    :param array: Function to transform the independent variable.
     :param class_weight: Element weights.
     :param deviation: Deviation function between the actual and predicted values.
     :param n_output: Number of outputs.
@@ -371,7 +374,7 @@ def classifier(parameters: object,
     """
 
     return estimator(parameters, model, X, y, batches=batches,
-                     array=array, class_weight=class_weight,
+                     class_weight=class_weight,
                      deviation=deviation, n_outputs=n_outputs,
                      validation=validation, discretize_val=discretize_val,
                      every_k_schedule=every_k_schedule,
