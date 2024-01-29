@@ -95,8 +95,8 @@ def optimize(parameters: object, batches: Batches,
         return jnp.where(m, b, a)
 
     @jax.jit
-    def evaluacion(parameters, estado, X, y, weights):
-        grads = objective_grad(parameters, X, y, weights)
+    def evaluacion(parameters, estado, X, y, weights, *model_args):
+        grads = objective_grad(parameters, X, y, weights, *model_args)
         updates, estado = optimizador.update(grads, estado, parameters)
         parameters = optax.apply_updates(parameters, updates)
         return parameters, estado
@@ -104,8 +104,8 @@ def optimize(parameters: object, batches: Batches,
     def _validation_score():
         if validation is None:
             return - jnp.inf
-        X, y = validation
-        hy = model(parameters, X)
+        X, y, *args = validation
+        hy = model(parameters, X, *args)
         if discretize_val:
             if y.ndim == 1:
                 hy = np.where(hy.flatten() > 0, 1, 0)
@@ -138,9 +138,9 @@ def optimize(parameters: object, batches: Batches,
     evolution = [fit[:2]]
     i = 1
     n_iter_no_change = n_iter_no_change * every_k_schedule
-    for _, (X, y, weights) in progress_bar(product(range(epochs),
-                                                   batches), total=total):
-        p, estado = evaluacion(parameters, estado, X, y, weights)
+    for _, (X, y, weights, *model_args) in progress_bar(product(range(epochs),
+                                                        batches), total=total):
+        p, estado = evaluacion(parameters, estado, X, y, weights, *model_args)
         parameters = jax.tree_map(update_finite, parameters, p)
         if (i % every_k_schedule) == 0:
             comp = _validation_score()
@@ -169,6 +169,7 @@ def estimator(parameters: object,
               deviation=None, n_outputs: int=None, validation=None,
               discretize_val: bool= True,
               classifier: bool=True,
+              model_args: tuple=None,
               **kwargs):
     """Estimator optimized with optax
 
@@ -189,6 +190,8 @@ def estimator(parameters: object,
     :type discretize_val: bool
     :param classifier: The estimator is classifier, default=True.
     :type classifier: bool
+    :param model_args: Extra arguments to the model
+    :type model_args: Tuple
 
     >>> import jax
     >>> from sklearn.datasets import load_iris
@@ -207,8 +210,8 @@ def estimator(parameters: object,
     """
 
     @jax.jit
-    def deviation_model_binary(params, X, y, weights):
-        hy = model(params, X)
+    def deviation_model_binary(params, X, y, weights, *args):
+        hy = model(params, X, *args)
         hy = nn.sigmoid(hy)
         hy = hy.flatten()
         y_ = jnp.vstack((y, 1 - y)).T
@@ -216,14 +219,14 @@ def estimator(parameters: object,
         return deviation(y_, hy_, weights)
 
     @jax.jit
-    def deviation_model(params, X, y, weights):
-        hy = model(params, X)
+    def deviation_model(params, X, y, weights, *args):
+        hy = model(params, X, *args)
         hy = nn.softmax(hy, axis=-1)
         return deviation(y, hy, weights)
     
     @jax.jit
-    def deviation_regression(params, X, y, weights):
-        hy = model(params, X)
+    def deviation_regression(params, X, y, weights, *args):
+        hy = model(params, X, *args)
         return deviation(y, hy, weights)
 
     def encode(y, n_outputs, validation):
@@ -255,19 +258,23 @@ def estimator(parameters: object,
             balance = lambda x: jnp.ones(x.shape[0]) / x.shape[0]
 
         for idx in splits:
-            batches_.append((array(X[idx]),
-                             jnp.array(y_enc[idx]),
-                             jnp.array(balance(y[idx]))))
-        return batches_, splits
+            args = [array(X[idx]), jnp.array(y_enc[idx]),
+                    jnp.array(balance(y[idx]))]
+            if model_args is not None:
+                args += [array(x[idx]) for x in model_args]
+            batches_.append(tuple(args))
+        return batches_
 
     def _validation(validation, X, y_enc, y):
         if validation is not None and hasattr(validation, 'split'):
             tr, vs = next(validation.split(X, y))
             validation = [array(X[vs]), jnp.array(y_enc[vs])]
+            if model_args is not None:
+                validation += [array(x[vs]) for x in model_args]
             X, y_enc = X[tr], y_enc[tr]
             y = y[tr]
         elif validation is not None and not hasattr(validation, 'split'):
-            validation = [array(validation[0]), jnp.array(validation[1])]
+            validation = [array(validation[0]), jnp.array(validation[1])] + [array(x) for x in validation[2:]]
         return validation, X, y_enc, y
 
     def _objective(deviation):
@@ -292,18 +299,17 @@ def estimator(parameters: object,
         else:
             validation = ShuffleSplit(n_splits=1, test_size=test_size)
     if n_outputs is None:
-        n_outputs = model(parameters, array(X[:1])).shape[-1]
+        args = ()
+        if model_args is not None:
+            args = (array(x[:1]) for x in model_args)
+        n_outputs = model(parameters,
+                          array(X[:1]), *args).shape[-1]
     if classifier:
         y_enc = encode(y, n_outputs, validation)
     else:
         y_enc = y
     validation, X, y_enc, y = _validation(validation, X, y_enc, y)
-    batches_, splits = create_batches(batches)
-    if n_iter_no_change < jnp.inf and validation is None:
-        jaccard = Batches.jaccard(splits)
-        index = jaccard.argmin()
-        validation = batches_[index][:2]
-        del batches_[index]
+    batches_ = create_batches(batches)
     objective, deviation = _objective(deviation)
     return optimize(parameters, batches_, objective,
                     n_iter_no_change=n_iter_no_change,
@@ -420,8 +426,8 @@ def regression(parameters: object,
                           W0=m.intercept_)
     >>> p, evolution = regression(parameters, model, X, y,
                                   return_evolution=True)
-    """    
-    
+    """
+
     return estimator(parameters, model, X, y,
                      deviation=deviation,
                      discretize_val=discretize_val,
@@ -431,4 +437,4 @@ def regression(parameters: object,
                      epochs=epochs,
                      learning_rate=learning_rate,
                      n_iter_no_change=n_iter_no_change,
-                     **kwargs) 
+                     **kwargs)

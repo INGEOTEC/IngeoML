@@ -58,6 +58,38 @@ def test_optimize():
     assert fit2 < fit1
 
 
+def test_optimize_model_args():
+    """Test optimize"""
+
+    @jax.jit
+    def modelo(params, X, X2):
+        Y = X2 @ params['W'] + params['W0']
+        return Y
+
+    @jax.jit
+    def media_entropia_cruzada(params, X, y, pesos, *model_args):
+        hy = modelo(params, X, *model_args)
+        hy = jax.nn.softmax(jnp.array(hy), axis=1)
+        return - ((y * jnp.log(hy)).sum(axis=1) * pesos).sum()
+
+    X, y = load_iris(return_X_y=True)
+    m = LinearSVC(dual='auto').fit(X, y)
+    parameters = dict(W=m.coef_.T,
+                      W0=m.intercept_)
+    encoder = OneHotEncoder(sparse_output=False).fit(y.reshape(-1, 1))
+    batches = Batches()
+    a = jnp.array
+    y_enc = encoder.transform(y.reshape(-1, 1))
+    batches = [[a(X[idx]), a(y_enc[idx]),
+                jnp.ones(idx.shape[0]), a(X[idx])]
+               for idx in batches.split(y=y)]
+    p = optimize(parameters, batches, media_entropia_cruzada)
+    assert np.fabs(p['W'] - parameters['W']).sum() > 0
+    fit1 = media_entropia_cruzada(parameters, *batches[0])
+    fit2 = media_entropia_cruzada(p, *batches[0])
+    assert fit2 < fit1    
+
+
 def test_classifier():
     """Classifier optimize with jax"""
     from sklearn.metrics import recall_score
@@ -87,6 +119,30 @@ def test_classifier():
                       W0=jnp.array(m.intercept_))
     p2, evol = classifier(parameters, modelo, X, y,
                           return_evolution=True)
+    evol = np.array([x[1] for x in evol])
+    assert np.any(np.diff(evol) != 0)
+
+
+def test_classifier_model_args():
+    """Classifier optimize with jax"""
+    from sklearn.metrics import recall_score
+    from sklearn.datasets import load_wine
+
+    @jax.jit
+    def modelo(params, X, X2):
+        Y = X2 @ params['W'] + params['W0']
+        return Y
+
+    X, y = load_wine(return_X_y=True)
+    index = np.arange(X.shape[0])
+    np.random.shuffle(index)
+    m = LinearSVC(dual='auto').fit(X[index[:100]], y[:100])
+    parameters = dict(W=jnp.array(m.coef_.T),
+                      W0=jnp.array(m.intercept_))
+    p, evol = classifier(parameters, modelo, X, y,
+                         # learning_rate=1e-3,
+                         return_evolution=True,
+                         model_args=(X,))
     evol = np.array([x[1] for x in evol])
     assert np.any(np.diff(evol) != 0)
 
@@ -248,6 +304,7 @@ def test_classifier_validation():
                    epochs=3, every_k_schedule=2,
                    n_iter_no_change=2,
                    validation=validation)
+
 
 def test_classifier_evolution():
     """Test the evolution feature"""
