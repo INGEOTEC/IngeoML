@@ -319,7 +319,10 @@ def estimator(parameters: object,
     batches_ = create_batches(batches)
     objective, deviation = _objective(deviation)
     if callable(parameters):
-        parameters = parameters(X, y_enc, *model_args)
+        if model_args is not None:
+            parameters = parameters(X, y_enc, *model_args)
+        else:
+            parameters = parameters(X, y_enc)
     return optimize(parameters, batches_, objective,
                     n_iter_no_change=n_iter_no_change,
                     validation=validation, model=model,
