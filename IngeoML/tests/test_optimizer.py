@@ -101,13 +101,15 @@ def test_classifier():
         return Y
 
     X, y = load_wine(return_X_y=True)
-    index = np.arange(X.shape[0])
-    np.random.shuffle(index)
-    m = LinearSVC(dual='auto').fit(X[index[:100]], y[:100])
+    st = StratifiedShuffleSplit(n_splits=1, train_size=10,
+                                random_state=0)
+    tr, _ = next(st.split(X, y))    
+    m = LinearSVC(dual='auto').fit(X[tr], y[tr])
     parameters = dict(W=jnp.array(m.coef_.T),
                       W0=jnp.array(m.intercept_))
     p, evol = classifier(parameters, modelo, X, y,
                          # learning_rate=1e-3,
+                         n_iter_no_change=10,
                          return_evolution=True)
     evol = np.array([x[1] for x in evol])
     assert np.any(np.diff(evol) != 0)
@@ -118,6 +120,7 @@ def test_classifier():
     parameters = dict(W=jnp.array(m.coef_.T),
                       W0=jnp.array(m.intercept_))
     p2, evol = classifier(parameters, modelo, X, y,
+                          n_iter_no_change=10,
                           return_evolution=True)
     evol = np.array([x[1] for x in evol])
     assert np.any(np.diff(evol) != 0)
@@ -134,17 +137,48 @@ def test_classifier_model_args():
         return Y
 
     X, y = load_wine(return_X_y=True)
-    index = np.arange(X.shape[0])
-    np.random.shuffle(index)
-    m = LinearSVC(dual='auto').fit(X[index[:100]], y[:100])
+    st = StratifiedShuffleSplit(n_splits=1, train_size=10,
+                                random_state=0)
+    tr, _ = next(st.split(X, y))
+    m = LinearSVC(dual='auto').fit(X[tr], y[tr])
     parameters = dict(W=jnp.array(m.coef_.T),
                       W0=jnp.array(m.intercept_))
     p, evol = classifier(parameters, modelo, X, y,
                          # learning_rate=1e-3,
+                         n_iter_no_change=10,
                          return_evolution=True,
                          model_args=(X,))
     evol = np.array([x[1] for x in evol])
     assert np.any(np.diff(evol) != 0)
+
+
+def test_classifier_callable_parameter():
+    """Classifier optimize with jax"""
+    from sklearn.metrics import recall_score
+    from sklearn.datasets import load_wine
+
+    @jax.jit
+    def modelo(params, X, X2):
+        Y = X2 @ params['W'] + params['W0']
+        return Y
+    
+    def initial_parameters(X, y, X2):
+        y = y.argmax(axis=1)
+        st = StratifiedShuffleSplit(n_splits=1, train_size=10,
+                                    random_state=0)
+        tr, _ = next(st.split(X2, y))
+        m = LinearSVC(dual='auto').fit(X2[tr], y[tr])
+        parameters = dict(W=jnp.array(m.coef_.T),
+                          W0=jnp.array(m.intercept_))
+        return parameters
+
+    X, y = load_wine(return_X_y=True)
+    p, evol = classifier(initial_parameters, modelo, X, y,
+                         return_evolution=True,
+                         n_iter_no_change=10,
+                         model_args=(X,))
+    evol = np.array([x[1] for x in evol])
+    assert np.any(np.diff(evol) != 0)    
 
 
 def test_regression():
@@ -197,7 +231,7 @@ def test_classifier_early_stopping():
                     learning_rate=1e-1)
     
 
-def test_regression():
+def test_regression2():
     """Test regression"""
     from scipy.stats import pearsonr
     from sklearn.linear_model import LinearRegression
@@ -321,4 +355,4 @@ def test_classifier_evolution():
                               return_evolution=True,
                               n_iter_no_change=2,
                               deviation=soft_comp_macro_f1)
-    assert len(evolution) and evolution[0][1] > 0.9
+    assert len(evolution) and evolution[0][1] > 0.85

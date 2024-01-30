@@ -16,10 +16,12 @@ from itertools import product
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.metrics import f1_score
 from sklearn.model_selection import ShuffleSplit, StratifiedShuffleSplit
+from scipy.sparse import spmatrix
 import numpy as np
 import jax
 import jax.numpy as jnp
 from jax import nn
+from jax.experimental.sparse import BCSR
 import optax
 from IngeoML.utils import Batches, balance_class_weights, progress_bar, soft_BER, cos_distance, cos_similarity
 
@@ -163,7 +165,6 @@ def estimator(parameters: object,
               model: Callable[[object, jnp.array], jnp.array],
               X, y,
               batches: Batches=None,
-              array: Callable[[object],object]=jnp.array,
               class_weight: str='balanced',
               n_iter_no_change: int=jnp.inf,
               deviation=None, n_outputs: int=None, validation=None,
@@ -179,7 +180,6 @@ def estimator(parameters: object,
     :param y: Dependent variable.
     :param batches: Batches used in the optimization.
     :type batches: :py:class:`~IngeoML.utils.Batches`
-    :param array: Function to transform the independent variable.
     :param class_weight: Element weights.
     :param n_iter_no_change: Number of iterations without improving the performance.
     :type n_iter_no_change: int
@@ -229,9 +229,9 @@ def estimator(parameters: object,
         hy = model(params, X, *args)
         return deviation(y, hy, weights)
 
-    def encode(y, n_outputs, validation):
-        if n_outputs == 1:
-            labels = np.unique(y)
+    def encode(y, validation):
+        labels = np.unique(y)
+        if labels.shape[0] == 2:
             h = {v:k for k, v in enumerate(labels)}
             y_enc = np.array([h[x] for x in y])
             if validation is not None and not hasattr(validation, 'split'):
@@ -244,6 +244,11 @@ def estimator(parameters: object,
                 _ = validation[1]
                 validation[1] = encoder.transform(_.reshape(-1, 1))
         return y_enc
+    
+    def array(data):
+        if isinstance(data, spmatrix):
+            return BCSR.from_scipy_sparse(data)
+        return jnp.array(data)
 
     def create_batches(batches):
         if batches is None:
@@ -265,17 +270,18 @@ def estimator(parameters: object,
             batches_.append(tuple(args))
         return batches_
 
-    def _validation(validation, X, y_enc, y):
+    def _validation(validation, X, y_enc, y, model_args):
         if validation is not None and hasattr(validation, 'split'):
             tr, vs = next(validation.split(X, y))
             validation = [array(X[vs]), jnp.array(y_enc[vs])]
             if model_args is not None:
                 validation += [array(x[vs]) for x in model_args]
+                model_args = [x[tr] for x in model_args]
             X, y_enc = X[tr], y_enc[tr]
             y = y[tr]
         elif validation is not None and not hasattr(validation, 'split'):
             validation = [array(validation[0]), jnp.array(validation[1])] + [array(x) for x in validation[2:]]
-        return validation, X, y_enc, y
+        return validation, X, y_enc, y, model_args
 
     def _objective(deviation):
         if not classifier:
@@ -298,19 +304,25 @@ def estimator(parameters: object,
             validation = StratifiedShuffleSplit(n_splits=1, test_size=test_size)
         else:
             validation = ShuffleSplit(n_splits=1, test_size=test_size)
-    if n_outputs is None:
-        args = ()
-        if model_args is not None:
-            args = (array(x[:1]) for x in model_args)
-        n_outputs = model(parameters,
-                          array(X[:1]), *args).shape[-1]
+
     if classifier:
-        y_enc = encode(y, n_outputs, validation)
+        y_enc = encode(y, validation)
     else:
         y_enc = y
-    validation, X, y_enc, y = _validation(validation, X, y_enc, y)
+    validation, X, y_enc, y, model_args = _validation(validation, X,
+                                                      y_enc, y, model_args)
+    if n_outputs is None:
+        if y_enc.ndim == 1:
+            n_outputs = 1
+        else:
+            n_outputs = y_enc.shape[-1]
     batches_ = create_batches(batches)
     objective, deviation = _objective(deviation)
+    if callable(parameters):
+        if model_args is not None:
+            parameters = parameters(X, y_enc, *model_args)
+        else:
+            parameters = parameters(X, y_enc)
     return optimize(parameters, batches_, objective,
                     n_iter_no_change=n_iter_no_change,
                     validation=validation, model=model,
@@ -322,7 +334,6 @@ def classifier(parameters: object,
                model: Callable[[object, jnp.array], jnp.array],
                X, y,
                batches: Batches=None,
-               array: Callable[[object],object]=jnp.array,
                class_weight: str='balanced',
                deviation=None, n_outputs: int=None, validation=None,
                discretize_val: bool= True,
@@ -338,7 +349,6 @@ def classifier(parameters: object,
     :param y: Dependent variable.
     :param batches: Batches used in the optimization.
     :type batches: :py:class:`~IngeoML.utils.Batches`
-    :param array: Function to transform the independent variable.
     :param class_weight: Element weights.
     :param deviation: Deviation function between the actual and predicted values.
     :param n_output: Number of outputs.
@@ -371,7 +381,7 @@ def classifier(parameters: object,
     """
 
     return estimator(parameters, model, X, y, batches=batches,
-                     array=array, class_weight=class_weight,
+                     class_weight=class_weight,
                      deviation=deviation, n_outputs=n_outputs,
                      validation=validation, discretize_val=discretize_val,
                      every_k_schedule=every_k_schedule,
