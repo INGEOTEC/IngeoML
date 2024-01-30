@@ -270,17 +270,18 @@ def estimator(parameters: object,
             batches_.append(tuple(args))
         return batches_
 
-    def _validation(validation, X, y_enc, y):
+    def _validation(validation, X, y_enc, y, model_args):
         if validation is not None and hasattr(validation, 'split'):
             tr, vs = next(validation.split(X, y))
             validation = [array(X[vs]), jnp.array(y_enc[vs])]
             if model_args is not None:
                 validation += [array(x[vs]) for x in model_args]
+                model_args = [x[tr] for x in model_args]
             X, y_enc = X[tr], y_enc[tr]
             y = y[tr]
         elif validation is not None and not hasattr(validation, 'split'):
             validation = [array(validation[0]), jnp.array(validation[1])] + [array(x) for x in validation[2:]]
-        return validation, X, y_enc, y
+        return validation, X, y_enc, y, model_args
 
     def _objective(deviation):
         if not classifier:
@@ -313,7 +314,8 @@ def estimator(parameters: object,
         y_enc = encode(y, n_outputs, validation)
     else:
         y_enc = y
-    validation, X, y_enc, y = _validation(validation, X, y_enc, y)
+    validation, X, y_enc, y, model_args = _validation(validation, X,
+                                                      y_enc, y, model_args)
     batches_ = create_batches(batches)
     objective, deviation = _objective(deviation)
     return optimize(parameters, batches_, objective,
