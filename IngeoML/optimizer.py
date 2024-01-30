@@ -229,9 +229,9 @@ def estimator(parameters: object,
         hy = model(params, X, *args)
         return deviation(y, hy, weights)
 
-    def encode(y, n_outputs, validation):
-        if n_outputs == 1:
-            labels = np.unique(y)
+    def encode(y, validation):
+        labels = np.unique(y)
+        if labels.shape[0] == 2:
             h = {v:k for k, v in enumerate(labels)}
             y_enc = np.array([h[x] for x in y])
             if validation is not None and not hasattr(validation, 'split'):
@@ -304,20 +304,22 @@ def estimator(parameters: object,
             validation = StratifiedShuffleSplit(n_splits=1, test_size=test_size)
         else:
             validation = ShuffleSplit(n_splits=1, test_size=test_size)
-    if n_outputs is None:
-        args = ()
-        if model_args is not None:
-            args = (array(x[:1]) for x in model_args)
-        n_outputs = model(parameters,
-                          array(X[:1]), *args).shape[-1]
+
     if classifier:
-        y_enc = encode(y, n_outputs, validation)
+        y_enc = encode(y, validation)
     else:
         y_enc = y
     validation, X, y_enc, y, model_args = _validation(validation, X,
                                                       y_enc, y, model_args)
+    if n_outputs is None:
+        if y_enc.ndim == 1:
+            n_outputs = 1
+        else:
+            n_outputs = y_enc.shape[-1]
     batches_ = create_batches(batches)
     objective, deviation = _objective(deviation)
+    if callable(parameters):
+        parameters = parameters(X, y_enc, *model_args)
     return optimize(parameters, batches_, objective,
                     n_iter_no_change=n_iter_no_change,
                     validation=validation, model=model,
