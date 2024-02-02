@@ -21,7 +21,7 @@ import jax.numpy as jnp
 from jax import nn
 import jax
 from IngeoML.optimizer import optimize, classifier, regression
-from IngeoML.utils import Batches, cross_entropy, soft_error, soft_comp_macro_f1
+from IngeoML.utils import Batches, cross_entropy, soft_error, soft_comp_macro_f1, soft_f1_score
 
 
 def test_optimize():
@@ -178,7 +178,7 @@ def test_classifier_callable_parameter():
                          n_iter_no_change=10,
                          model_args=(X,))
     evol = np.array([x[1] for x in evol])
-    assert np.any(np.diff(evol) != 0)    
+    assert np.any(np.diff(evol) != 0)
 
 
 def test_regression():
@@ -356,3 +356,65 @@ def test_classifier_evolution():
                               n_iter_no_change=2,
                               deviation=soft_comp_macro_f1)
     assert len(evolution) and evolution[0][1] > 0.85
+
+
+def test_classifier_discretize_val():
+    """Classifier optimize with jax"""
+    from sklearn.metrics import recall_score
+    from sklearn.datasets import load_wine
+
+    @jax.jit
+    def soft_macro_f1(y, hy, w=None):
+        return soft_f1_score(y, nn.softmax(hy, axis=-1)).mean()
+
+    @jax.jit
+    def modelo(params, X, X2):
+        Y = X2 @ params['W'] + params['W0']
+        return Y
+    
+    def initial_parameters(X, y, X2):
+        y = y.argmax(axis=1)
+        st = StratifiedShuffleSplit(n_splits=1, train_size=10,
+                                    random_state=0)
+        tr, _ = next(st.split(X2, y))
+        m = LinearSVC(dual='auto').fit(X2[tr], y[tr])
+        parameters = dict(W=jnp.array(m.coef_.T),
+                          W0=jnp.array(m.intercept_))
+        return parameters
+
+    X, y = load_wine(return_X_y=True)
+    p, evol = classifier(initial_parameters, modelo, X, y,
+                         return_evolution=True,
+                         discretize_val=False,
+                         validation_score=soft_macro_f1,
+                         model_args=(X,))
+    evol = np.array([x[1] for x in evol])
+    assert np.any(np.diff(evol) != 0)
+
+
+def test_classifier_validation_zero():
+    """Classifier optimize with jax"""
+    from sklearn.metrics import recall_score
+    from sklearn.datasets import load_wine
+
+    @jax.jit
+    def modelo(params, X, X2):
+        Y = X2 @ params['W'] + params['W0']
+        return Y
+    
+    def initial_parameters(X, y, X2):
+        y = y.argmax(axis=1)
+        st = StratifiedShuffleSplit(n_splits=1, train_size=20,
+                                    random_state=0)
+        tr, _ = next(st.split(X2, y))
+        m = LinearSVC(dual='auto').fit(X2[tr], y[tr])
+        parameters = dict(W=jnp.array(m.coef_.T),
+                          W0=jnp.array(m.intercept_))
+        return parameters
+
+    X, y = load_wine(return_X_y=True)
+    p, evol = classifier(initial_parameters, modelo, X, y,
+                         return_evolution=True,
+                         validation=0,
+                         model_args=(X,))
+    assert len(evol) > 8
