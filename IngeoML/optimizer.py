@@ -26,9 +26,16 @@ import optax
 from IngeoML.utils import Batches, balance_class_weights, progress_bar, soft_BER, cos_distance, cos_similarity
 
 
-def optimize(parameters: object, batches: Batches,
+def array(data):
+    """Encode data into jax format"""
+    if isinstance(data, spmatrix):
+        return BCSR.from_scipy_sparse(data)
+    return jnp.array(data)
+
+
+def optimize(parameters: object, batches: list,
              objective: Callable[[object, jnp.array, jnp.array], object],
-             epochs: int=5, learning_rate: float=1e-2,
+             epochs: int=5, learning_rate: float=1e-4,
              every_k_schedule: int=None,
              n_iter_no_change: int=jnp.inf,
              validation=None,
@@ -42,7 +49,7 @@ def optimize(parameters: object, batches: Batches,
     
     :param parameters: Parameters to optimize.
     :param batches: Batches used in the optimization.
-    :type batches: :py:class:`~IngeoML.utils.Batches`
+    :type batches: list
     :param objective: Objective function.
     :param epochs: Number of epochs.
     :param learning_rate: Learning rate, default=1e-2.
@@ -171,6 +178,8 @@ def estimator(parameters: object,
               discretize_val: bool= True,
               classifier: bool=True,
               model_args: tuple=None,
+              random_state: int=0,
+              distribution=False,
               **kwargs):
     """Estimator optimized with optax
 
@@ -192,6 +201,10 @@ def estimator(parameters: object,
     :type classifier: bool
     :param model_args: Extra arguments to the model
     :type model_args: Tuple
+    :param random_state: Random State
+    :type random_state: int
+    :param distribution: Whether the classifier's model outputs a distribution, default=False.
+    :type distribution: bool
 
     >>> import jax
     >>> from sklearn.datasets import load_iris
@@ -217,13 +230,21 @@ def estimator(parameters: object,
         y_ = jnp.vstack((y, 1 - y)).T
         hy_ = jnp.vstack((hy, 1 - hy)).T        
         return deviation(y_, hy_, weights)
+    
+    @jax.jit
+    def deviation_model_binary_plain(params, X, y, weights, *args):
+        hy = model(params, X, *args)
+        hy = hy.flatten()
+        y_ = jnp.vstack((y, 1 - y)).T
+        hy_ = jnp.vstack((hy, 1 - hy)).T        
+        return deviation(y_, hy_, weights)    
 
     @jax.jit
     def deviation_model(params, X, y, weights, *args):
         hy = model(params, X, *args)
         hy = nn.softmax(hy, axis=-1)
         return deviation(y, hy, weights)
-    
+
     @jax.jit
     def deviation_regression(params, X, y, weights, *args):
         hy = model(params, X, *args)
@@ -245,11 +266,6 @@ def estimator(parameters: object,
                 validation[1] = encoder.transform(_.reshape(-1, 1))
         return y_enc
     
-    def array(data):
-        if isinstance(data, spmatrix):
-            return BCSR.from_scipy_sparse(data)
-        return jnp.array(data)
-
     def create_batches(batches):
         if batches is None:
             batches = Batches(size=512 if X.shape[0] >= 2048 else 256,
@@ -289,9 +305,15 @@ def estimator(parameters: object,
         if deviation is None:
             deviation = soft_BER
         if n_outputs == 1:
-            objective = deviation_model_binary
+            if distribution:
+                objective = deviation_model_binary_plain
+            else:
+                objective = deviation_model_binary
         else:
-            objective = deviation_model
+            if distribution:
+                objective = deviation_regression
+            else:
+                objective = deviation_model
         return objective, deviation
 
     if validation is None:
@@ -301,9 +323,14 @@ def estimator(parameters: object,
         else:
             test_size = 512
         if classifier and class_weight == 'balanced':
-            validation = StratifiedShuffleSplit(n_splits=1, test_size=test_size)
+            validation = StratifiedShuffleSplit(n_splits=1, random_state=random_state,
+                                                test_size=test_size)
         else:
-            validation = ShuffleSplit(n_splits=1, test_size=test_size)
+            validation = ShuffleSplit(n_splits=1, random_state=random_state,
+                                      test_size=test_size)
+    if isinstance(validation, int) and validation == 0:
+        validation = None
+        n_iter_no_change = jnp.inf
 
     if classifier:
         y_enc = encode(y, validation)
