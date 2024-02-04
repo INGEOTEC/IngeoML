@@ -179,6 +179,7 @@ def estimator(parameters: object,
               classifier: bool=True,
               model_args: tuple=None,
               random_state: int=0,
+              distribution=False,
               **kwargs):
     """Estimator optimized with optax
 
@@ -202,6 +203,8 @@ def estimator(parameters: object,
     :type model_args: Tuple
     :param random_state: Random State
     :type random_state: int
+    :param distribution: Whether the classifier's model outputs a distribution, default=False.
+    :type distribution: bool
 
     >>> import jax
     >>> from sklearn.datasets import load_iris
@@ -227,13 +230,21 @@ def estimator(parameters: object,
         y_ = jnp.vstack((y, 1 - y)).T
         hy_ = jnp.vstack((hy, 1 - hy)).T        
         return deviation(y_, hy_, weights)
+    
+    @jax.jit
+    def deviation_model_binary_plain(params, X, y, weights, *args):
+        hy = model(params, X, *args)
+        hy = hy.flatten()
+        y_ = jnp.vstack((y, 1 - y)).T
+        hy_ = jnp.vstack((hy, 1 - hy)).T        
+        return deviation(y_, hy_, weights)    
 
     @jax.jit
     def deviation_model(params, X, y, weights, *args):
         hy = model(params, X, *args)
         hy = nn.softmax(hy, axis=-1)
         return deviation(y, hy, weights)
-    
+
     @jax.jit
     def deviation_regression(params, X, y, weights, *args):
         hy = model(params, X, *args)
@@ -294,9 +305,15 @@ def estimator(parameters: object,
         if deviation is None:
             deviation = soft_BER
         if n_outputs == 1:
-            objective = deviation_model_binary
+            if distribution:
+                objective = deviation_model_binary_plain
+            else:
+                objective = deviation_model_binary
         else:
-            objective = deviation_model
+            if distribution:
+                objective = deviation_regression
+            else:
+                objective = deviation_model
         return objective, deviation
 
     if validation is None:

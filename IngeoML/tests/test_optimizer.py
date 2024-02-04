@@ -206,7 +206,7 @@ def test_classifier_early_stopping():
     @jax.jit
     def modelo(params, X):
         Y = X @ params['W'] + params['W0']
-        return Y
+        return Y    
 
     X, y = load_iris(return_X_y=True)
     m = LinearSVC(dual='auto').fit(X, y)
@@ -418,3 +418,31 @@ def test_classifier_validation_zero():
                          validation=0,
                          model_args=(X,))
     assert len(evol) > 8
+
+
+def test_classifier_distribution():
+    """Classifier optimize with jax"""
+    from sklearn.metrics import recall_score
+    from sklearn.datasets import load_wine
+
+    @jax.jit
+    def modelo(params, X, X2):
+        Y = X2 @ params['W'] + params['W0']
+        return nn.softmax(Y, axis=1)
+    
+    def initial_parameters(X, y, X2):
+        y = y.argmax(axis=1)
+        st = StratifiedShuffleSplit(n_splits=1, train_size=20,
+                                    random_state=0)
+        tr, _ = next(st.split(X2, y))
+        m = LinearSVC(dual='auto').fit(X2[tr], y[tr])
+        parameters = dict(W=jnp.array(m.coef_.T),
+                          W0=jnp.array(m.intercept_))
+        return parameters
+
+    X, y = load_wine(return_X_y=True)
+    p, evol = classifier(initial_parameters, modelo, X, y,
+                         return_evolution=True,
+                         validation=0, distribution=True,
+                         model_args=(X,))
+    assert len(evol) > 8    
