@@ -98,7 +98,7 @@ class StatisticSamples(object):
             self._samples = _
             return self._samples
         try:
-            if self._samples.shape[0] == N:
+            if self._samples.shape[1] == N:
                 return self._samples
             else:
                 return inner(N)
