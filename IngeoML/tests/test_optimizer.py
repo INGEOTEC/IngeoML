@@ -21,7 +21,7 @@ import jax.numpy as jnp
 from jax import nn
 import jax
 from IngeoML.optimizer import optimize, classifier, regression
-from IngeoML.utils import Batches, cross_entropy, soft_error, soft_comp_macro_f1, soft_f1_score
+from IngeoML.utils import Batches, cross_entropy, soft_error, soft_comp_macro_f1, soft_f1_score, support, soft_comp_weighted_f1
 
 
 def test_optimize():
@@ -445,4 +445,34 @@ def test_classifier_distribution():
                          return_evolution=True,
                          validation=0, distribution=True,
                          model_args=(X,))
-    assert len(evol) > 8    
+    assert len(evol) > 8
+
+
+def test_classifier_class_weight():
+    """Classifier optimize with jax"""
+    from sklearn.datasets import load_wine
+
+    @jax.jit
+    def modelo(params, X, X2):
+        Y = X2 @ params['W'] + params['W0']
+        return nn.softmax(Y, axis=1)
+    
+    def initial_parameters(X, y, X2):
+        y = y.argmax(axis=1)
+        st = StratifiedShuffleSplit(n_splits=1, train_size=20,
+                                    random_state=0)
+        tr, _ = next(st.split(X2, y))
+        m = LinearSVC(dual='auto').fit(X2[tr], y[tr])
+        parameters = dict(W=jnp.array(m.coef_.T),
+                          W0=jnp.array(m.intercept_))
+        return parameters
+ 
+    X, y = load_wine(return_X_y=True)
+    p, evol = classifier(initial_parameters, modelo, X, y,
+                         return_evolution=True,
+                         class_weight=support,
+                         deviation=soft_comp_weighted_f1,
+                         validation=0,
+                         distribution=True,
+                         model_args=(X,))
+    assert len(evol) > 8   

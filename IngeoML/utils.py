@@ -232,6 +232,20 @@ def balance_class_weights(labels) -> np.ndarray:
     return weights
 
 
+def support(labels) -> np.ndarray:
+    """Weights of the labels set to balance
+    
+    >>> import numpy as np
+    >>> from IngeoML.utils import support
+    >>> support(np.array(['a', 'a', 'b']))
+    array([0.45454545, 0.45454545, 0.09090909])
+    """
+
+    y_ = labels
+    labels, cnts = np.unique(y_, return_counts=True)
+    return cnts / cnts.sum()
+
+
 @jax.jit
 def cross_entropy(y: jnp.array, hy: jnp.array, weights: jnp.array) -> jnp.array:
     """Cross-entropy loss
@@ -446,7 +460,7 @@ def soft_comp_weighted_f1(y: jnp.array, hy: jnp.array, weights: jnp.array) -> jn
     :param weights: Weights are not used
 
     >>> import jax.numpy as jnp
-    >>> from IngeoML.utils import soft_comp_macro_f1
+    >>> from IngeoML.utils import soft_comp_weighted_f1
     >>> y = jnp.array([[1, 0, 0],
                        [1, 0, 0],
                        [0, 1, 0],

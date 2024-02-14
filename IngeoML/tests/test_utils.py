@@ -19,7 +19,7 @@ from sklearn.datasets import load_iris, load_breast_cancer
 from sklearn.svm import LinearSVC
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import OneHotEncoder
-from IngeoML.utils import Batches, balance_class_weights, cross_entropy, soft_error, soft_recall, soft_BER, soft_precision, soft_f1_score, soft_comp_macro_f1, cos_distance, pearson, pearson_distance, pearson_similarity, soft_comp_weighted_f1
+from IngeoML.utils import Batches, balance_class_weights, cross_entropy, soft_error, soft_recall, soft_BER, soft_precision, soft_f1_score, soft_comp_macro_f1, cos_distance, pearson, pearson_distance, pearson_similarity, soft_comp_weighted_f1, support
 
 
 def test_batches():
@@ -58,6 +58,13 @@ def test_balance_class_weights():
     w = balance_class_weights(y)
     assert w.sum() == 1
     assert w.shape[0] == y.shape[0]
+
+
+def test_support():
+    """Support"""
+    y = np.r_[0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 2]
+    w = support(y)
+    assert w.shape[0] == 3
 
 
 def test_batches_nofill():
