@@ -19,7 +19,7 @@ from sklearn.datasets import load_iris, load_breast_cancer
 from sklearn.svm import LinearSVC
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import OneHotEncoder
-from IngeoML.utils import Batches, balance_class_weights, cross_entropy, soft_error, soft_recall, soft_BER, soft_precision, soft_f1_score, soft_comp_macro_f1, cos_distance, pearson, pearson_distance, pearson_similarity
+from IngeoML.utils import Batches, balance_class_weights, cross_entropy, soft_error, soft_recall, soft_BER, soft_precision, soft_f1_score, soft_comp_macro_f1, cos_distance, pearson, pearson_distance, pearson_similarity, soft_comp_weighted_f1
 
 
 def test_batches():
@@ -286,6 +286,29 @@ def test_soft_comp_macro_f1_grad():
     grad = jax.grad(deviation_model)
     p = grad(parameters, X, y_enc)
     assert jnp.fabs(p['W']).sum() > 0
+
+
+def test_soft_comp_weighted_f1():
+    """Test soft complement weighted-f1"""
+    y = jnp.array([[1, 0, 0],
+                   [1, 0, 0],
+                   [0, 1, 0],
+                   [0, 0, 1],
+                   [0, 0, 1],
+                   [0, 0, 1],
+                   [0, 0, 1]])
+    hy = jnp.array([[1, 0, 0],
+                    [0, 1, 0],
+                    [0, 1, 0],
+                    [0, 0, 1],
+                    [1, 0, 0],
+                    [1, 0, 0],
+                    [0, 1, 0]])
+    classes = y.argmax(axis=1)
+    _, freq = np.unique(classes, return_counts=True)
+    freq = freq / freq.sum()
+    res = soft_comp_weighted_f1(y, hy, jnp.array(freq))
+    assert jnp.fabs(res - 0.5857142) < 1e-7
 
 
 def test_cos_distance():
