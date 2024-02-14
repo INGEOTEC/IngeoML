@@ -438,6 +438,36 @@ def soft_comp_macro_f1(y: jnp.array, hy: jnp.array, weights=None) -> jnp.array:
 
 
 @jax.jit
+def soft_comp_weighted_f1(y: jnp.array, hy: jnp.array, weights: jnp.array) -> jnp.array:
+    """Soft Complement weighted-F1
+
+    :param y: Gold standard
+    :param hy: Predictions
+    :param weights: Weights are not used
+
+    >>> import jax.numpy as jnp
+    >>> from IngeoML.utils import soft_comp_macro_f1
+    >>> y = jnp.array([[1, 0, 0],
+                       [1, 0, 0],
+                       [0, 1, 0],
+                       [0, 0, 1],
+                       [0, 0, 1],
+                       [0, 0, 1],
+                       [0, 0, 1]])
+    >>> hy = jnp.array([[1, 0, 0],
+                        [0, 1, 0],
+                        [0, 1, 0],
+                        [0, 0, 1],
+                        [1, 0, 0],
+                        [1, 0, 0],
+                        [0, 1, 0]])
+    >>> soft_comp_weighted_f1(y, hy)
+    Array(0.5857142, dtype=float32)    
+    """
+
+    return 1 - (soft_f1_score(y, hy) * weights).sum()
+
+@jax.jit
 def cos_similarity(y: jnp.array, hy: jnp.array, weights=None) -> jnp.array:
     """Cos similarity
 
