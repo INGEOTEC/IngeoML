@@ -23,7 +23,7 @@ def feature_importance(model, X, y, predictions,
         score = lambda y, hy: f1_score(y, hy, average='macro')
     base = score(y, model.predict(X))
     hy = np.array([[score(y, j) for j in i]
-                  for i in predictions])
+                  for i in progress_bar(predictions)])
     return base - hy
 
 
