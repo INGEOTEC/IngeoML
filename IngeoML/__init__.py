@@ -13,6 +13,5 @@
 # limitations under the License.
 __version__ = '0.0.24'
 
-from IngeoML.bootstrap import CI, SE, StatisticSamples
 from IngeoML.feature_selection import SelectFromModelCV
 from IngeoML.optimizer import classifier, regression
