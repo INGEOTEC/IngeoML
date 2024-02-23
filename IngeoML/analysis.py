@@ -13,6 +13,7 @@
 # limitations under the License.
 from sklearn.metrics import f1_score
 import numpy as np
+from IngeoML.utils import progress_bar
 
 
 def feature_importance(model, X, y, predictions,
@@ -31,7 +32,7 @@ def predict_shuffle_inputs(model, X, times: int=100):
     X_origin = X.copy()
     rng = np.random.default_rng()
     output = []
-    for i in range(X.shape[1]):
+    for i in progress_bar(range(X.shape[1]), total=X.shape[1]):
         inner = []
         for _ in range(times):
             rng.shuffle(X[:, i])
