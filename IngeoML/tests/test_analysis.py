@@ -37,5 +37,5 @@ def test_predict_shuffle_inputs():
     split = ShuffleSplit(n_splits=1, train_size=0.7).split(X, y)
     tr, vs = next(split)
     m = LinearSVC(dual='auto').fit(X[tr], y[tr])
-    hy = predict_shuffle_inputs(m, X[vs])
+    hy = predict_shuffle_inputs(m, X[vs], n_jobs=-1)
     assert hy.shape == (4, 100, vs.shape[0])
