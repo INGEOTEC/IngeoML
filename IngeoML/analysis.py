@@ -45,7 +45,7 @@ def predict_shuffle_inputs(model, X, times: int=100, n_jobs: int=1):
     rng = np.random.default_rng()
     output = []
     output = Parallel(n_jobs=n_jobs,
-                      mmap_mode=None)(delayed(predict)(model, X, rng, i)
-                                      for i in progress_bar(range(X.shape[1]),
-                                                            total=X.shape[1]))
+                      max_nbytes=None)(delayed(predict)(model, X, rng, i)
+                                       for i in progress_bar(range(X.shape[1]),
+                                                             total=X.shape[1]))
     return np.array(output)
