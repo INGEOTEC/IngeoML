@@ -15,7 +15,7 @@ from sklearn.datasets import load_iris, load_digits
 from sklearn.metrics import f1_score, make_scorer
 from sklearn.model_selection import ShuffleSplit
 from sklearn.svm import LinearSVC
-from IngeoML.analysis import feature_importance, predict_shuffle_inputs
+from IngeoML.analysis import feature_importance, predict_shuffle_inputs, kfold_predict_shuffle_inputs
 
 
 def test_feature_importance():
@@ -39,3 +39,13 @@ def test_predict_shuffle_inputs():
     m = LinearSVC(dual='auto').fit(X[tr], y[tr])
     hy = predict_shuffle_inputs(m, X[vs], n_jobs=-1)
     assert hy.shape == (4, 100, vs.shape[0])
+
+
+def test_kfold_predict_shuffle_inputs():
+    """Test kfold_predict_shuffle_inputs"""
+
+    X, y = load_iris(return_X_y=True)
+    m = LinearSVC(dual='auto')
+    predictions = kfold_predict_shuffle_inputs(m, X, y)
+    assert predictions.shape == (4, 100, 150)
+
