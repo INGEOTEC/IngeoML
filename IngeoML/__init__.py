@@ -11,8 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-__version__ = '0.0.23'
+__version__ = '0.0.24'
 
-from IngeoML.bootstrap import CI, SE, StatisticSamples
 from IngeoML.feature_selection import SelectFromModelCV
 from IngeoML.optimizer import classifier, regression
+from IngeoML.analysis import feature_importance, predict_shuffle_inputs

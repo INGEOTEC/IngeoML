@@ -18,7 +18,6 @@ IngeoML
 .. toctree::
    :maxdepth: 1
 
-   bootstrap
    feature_selection
    cluster
    optimizer

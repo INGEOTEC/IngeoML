@@ -265,15 +265,20 @@ def estimator(parameters: object,
                 _ = validation[1]
                 validation[1] = encoder.transform(_.reshape(-1, 1))
         return y_enc
-    
+
     def create_batches(batches):
         if batches is None:
             batches = Batches(size=512 if X.shape[0] >= 2048 else 256,
                               random_state=0)
         batches_ = []
-        if classifier and class_weight == 'balanced':
+        if classifier:
             splits = batches.split(y=y)
-            balance = balance_class_weights
+            if class_weight == 'balanced':
+                balance = balance_class_weights
+            elif callable(class_weight):
+                balance = class_weight
+            else:
+                raise NotImplementedError()
         else:
             splits = batches.split(X)
             balance = lambda x: jnp.ones(x.shape[0]) / x.shape[0]
