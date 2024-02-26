@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from sklearn.metrics import f1_score
+from sklearn.model_selection import StratifiedKFold
+from sklearn.base import clone
 from joblib import Parallel, delayed
 import numpy as np
 from IngeoML.utils import progress_bar
@@ -49,3 +51,18 @@ def predict_shuffle_inputs(model, X, times: int=100, n_jobs: int=1):
                                        for i in progress_bar(range(X.shape[1]),
                                                              total=X.shape[1]))
     return np.array(output)
+
+
+def kfold_predict_shuffle_inputs(model, X, y, times: int=100, n_jobs: int=1,
+                                 cv: int=5):
+    """Predict X by shuffling all the inputs using cross-validation"""
+
+    if cv is None or isinstance(cv, int):
+        n_splits = 5 if cv is None else cv
+        cv = StratifiedKFold(n_splits=n_splits)
+    output = np.empty((X.shape[1], times, y.shape[0]))
+    for tr, vs in cv.split(X, y):
+        m = clone(model).fit(X[tr], y[tr])
+        output[:, :, vs] = predict_shuffle_inputs(m, X[vs], times=times,
+                                                  n_jobs=n_jobs)
+    return output
