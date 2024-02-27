@@ -15,4 +15,4 @@ __version__ = '0.0.25'
 
 from IngeoML.feature_selection import SelectFromModelCV
 from IngeoML.optimizer import classifier, regression
-from IngeoML.analysis import feature_importance, predict_shuffle_inputs
+from IngeoML.analysis import feature_importance, predict_shuffle_inputs, kfold_predict_shuffle_inputs
