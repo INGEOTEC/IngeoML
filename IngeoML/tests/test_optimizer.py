@@ -21,7 +21,8 @@ import jax.numpy as jnp
 from jax import nn
 import jax
 from IngeoML.optimizer import optimize, classifier, regression
-from IngeoML.utils import Batches, cross_entropy, soft_error, soft_comp_macro_f1, soft_f1_score, support, soft_comp_weighted_f1
+from IngeoML.utils import Batches, support 
+from IngeoML.jax_utils import cross_entropy, soft_error, soft_comp_macro_f1, soft_f1_score, soft_comp_weighted_f1
 
 
 def test_optimize():

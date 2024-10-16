@@ -23,7 +23,8 @@ import jax.numpy as jnp
 from jax import nn
 from jax.experimental.sparse import BCSR
 import optax
-from IngeoML.utils import Batches, balance_class_weights, progress_bar, soft_BER, cos_distance, cos_similarity
+from IngeoML.utils import Batches, balance_class_weights, progress_bar
+from IngeoML.jax_utils import soft_BER, cos_distance, cos_similarity
 
 
 def array(data):
