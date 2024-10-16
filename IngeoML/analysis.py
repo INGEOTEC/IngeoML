@@ -19,7 +19,7 @@ import numpy as np
 from IngeoML.utils import progress_bar
 
 
-def feature_importance(model, X, y, predictions,
+def feature_importance(y, hy, predictions,
                        score=None, n_jobs: int=1):
     """Estimate the feature importance of the model"""
     def compute_score(y, i):
@@ -27,7 +27,7 @@ def feature_importance(model, X, y, predictions,
 
     if score is None:
         score = lambda y, hy: f1_score(y, hy, average='macro')
-    base = score(y, model.predict(X))
+    base = score(y, hy)
     hy = Parallel(n_jobs=n_jobs)(delayed(compute_score)(y, i)
                                  for i in progress_bar(predictions))
     hy = np.array(hy)
@@ -59,10 +59,12 @@ def kfold_predict_shuffle_inputs(model, X, y, times: int=100, n_jobs: int=1,
 
     if cv is None or isinstance(cv, int):
         n_splits = 5 if cv is None else cv
-        cv = StratifiedKFold(n_splits=n_splits)
+        cv = StratifiedKFold(n_splits=n_splits, shuffle=True)
     output = np.empty((X.shape[1], times, y.shape[0]))
+    hy = np.empty_like(y)
     for tr, vs in cv.split(X, y):
         m = clone(model).fit(X[tr], y[tr])
         output[:, :, vs] = predict_shuffle_inputs(m, X[vs], times=times,
                                                   n_jobs=n_jobs)
-    return output
+        hy[vs] = m.predict(X[vs])
+    return hy, output

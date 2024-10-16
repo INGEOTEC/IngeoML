@@ -26,7 +26,7 @@ def test_feature_importance():
     tr, vs = next(split)
     m = LinearSVC(dual='auto').fit(X[tr], y[tr])
     predictions = predict_shuffle_inputs(m, X[vs], times=97)
-    diff = feature_importance(m, X[vs], y[vs], predictions)
+    diff = feature_importance(y[vs], m.predict(X[vs]), predictions)
     assert diff.shape == (4, 97)
 
 
@@ -46,6 +46,8 @@ def test_kfold_predict_shuffle_inputs():
 
     X, y = load_iris(return_X_y=True)
     m = LinearSVC(dual='auto')
-    predictions = kfold_predict_shuffle_inputs(m, X, y)
+    hy, predictions = kfold_predict_shuffle_inputs(m, X, y)
     assert predictions.shape == (4, 100, 150)
-
+    assert hy.shape == (150, )
+    diffs = feature_importance(y, hy, predictions)
+    assert diffs.shape == (4, 100)

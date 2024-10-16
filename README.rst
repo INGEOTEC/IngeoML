@@ -9,6 +9,12 @@ IngeoML
 .. image:: https://badge.fury.io/py/IngeoML.svg
 		:target: https://badge.fury.io/py/IngeoML
 
+.. image:: https://img.shields.io/conda/vn/conda-forge/ingeoml.svg
+		:target: https://anaconda.org/conda-forge/ingeoml
+
+.. image:: https://img.shields.io/conda/pn/conda-forge/ingeoml.svg
+		:target: https://anaconda.org/conda-forge/ingeoml
+
 .. image:: https://readthedocs.org/projects/ingeoml/badge/?version=latest
     :target: https://ingeoml.readthedocs.io/en/latest/?badge=latest
     :alt: Documentation Status

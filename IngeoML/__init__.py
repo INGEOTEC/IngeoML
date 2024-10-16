@@ -11,8 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-__version__ = '0.0.25'
-
+import logging
 from IngeoML.feature_selection import SelectFromModelCV
-from IngeoML.optimizer import classifier, regression
-from IngeoML.analysis import feature_importance, predict_shuffle_inputs
+from IngeoML.analysis import feature_importance
+from IngeoML.analysis import predict_shuffle_inputs, kfold_predict_shuffle_inputs
+logger = logging.getLogger(__name__)
+
+try:
+    from IngeoML.optimizer import classifier, regression
+except ImportError:
+    logger.warning('Install jax and optax to use IngeoML.optimizer')
+
+__version__ = '0.0.26'
