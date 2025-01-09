@@ -1,7 +1,7 @@
-.. _IngeoML:
+.. _supervised_learning:
 
 ====================================
-IngeoML
+Supervised Learning
 ====================================
 .. image:: https://github.com/INGEOTEC/IngeoML/actions/workflows/test.yaml/badge.svg
 		:target: https://github.com/INGEOTEC/IngeoML/actions/workflows/test.yaml
@@ -15,11 +15,9 @@ IngeoML
 .. image:: https://readthedocs.org/projects/ingeoml/badge/?version=latest
     :target: https://ingeoml.readthedocs.io/en/latest/?badge=latest
 
-.. toctree::
-   :maxdepth: 1
 
-   supervised_learning
-   feature_selection
-   cluster
-   optimizer
-   utils
+:py:class:`IngeoML.supervised_learning` API
+--------------------------------------------
+
+.. autoclass:: IngeoML.supervised_learning.ConvexClassifier
+    :members: mixer, fit, predict_proba, predict
