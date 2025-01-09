@@ -22,6 +22,7 @@ import jax
 import jax.numpy as jnp
 from jax import nn
 from jax.experimental.sparse import BCSR
+from jax.tree import map as tree_map
 import optax
 from IngeoML.utils import Batches, balance_class_weights, progress_bar
 from IngeoML.jax_utils import soft_BER, cos_distance, cos_similarity
@@ -122,7 +123,7 @@ def optimize(parameters: object, batches: list,
             else:
                 hy = hy.argmax(axis=1)
                 y = y.argmax(axis=1)
-        return validation_score(y, hy)
+        return validation_score(np.asarray(y), np.asarray(hy))
 
     def set_output(value):
         if return_evolution:
@@ -151,7 +152,7 @@ def optimize(parameters: object, batches: list,
     for _, (X, y, weights, *model_args) in progress_bar(product(range(epochs),
                                                         batches), total=total):
         p, estado = evaluacion(parameters, estado, X, y, weights, *model_args)
-        parameters = jax.tree_map(update_finite, parameters, p)
+        parameters = tree_map(update_finite, parameters, p)
         if (i % every_k_schedule) == 0:
             comp = _validation_score()
             evolution.append((i, comp))
