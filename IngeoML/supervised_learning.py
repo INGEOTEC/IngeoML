@@ -18,7 +18,7 @@ from scipy.special import expit, softmax
 import cvxpy as cp
 
 
-class ConvexClassifier(BaseEstimator, ClassifierMixin):
+class ConvexClassifier(ClassifierMixin, BaseEstimator):
     """Convex Classifier
     
     """
