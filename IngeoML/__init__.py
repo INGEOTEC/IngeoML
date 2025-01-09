@@ -15,6 +15,7 @@ import logging
 from IngeoML.feature_selection import SelectFromModelCV
 from IngeoML.analysis import feature_importance
 from IngeoML.analysis import predict_shuffle_inputs, kfold_predict_shuffle_inputs
+from IngeoML.supervised_learning import ConvexClassifier
 logger = logging.getLogger(__name__)
 
 try:
