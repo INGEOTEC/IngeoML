@@ -21,6 +21,20 @@ import cvxpy as cp
 class ConvexClassifier(ClassifierMixin, BaseEstimator):
     """Convex Classifier
     
+    >>> from sklearn.datasets import load_iris
+    >>> from sklearn.svm import LinearSVC
+    >>> from sklearn.ensemble import RandomForestClassifier
+    >>> from sklearn.ensemble import StackingClassifier
+    >>> from IngeoML import ConvexClassifier
+    >>> X, y = load_iris(return_X_y=True)
+    >>> svc = LinearSVC()
+    >>> forest = RandomForestClassifier()
+    >>> convex = ConvexClassifier()
+    >>> stack = StackingClassifier([('SVC', svc),
+                                     ('Forest', forest)],
+                                    final_estimator=convex).fit(X, y)
+    >>> stack.final_estimator_.mixer
+    array([0.01783184, 0.98216816])
     """
 
     @property
@@ -155,6 +169,7 @@ class ConvexClassifier(ClassifierMixin, BaseEstimator):
             neg = 1 - pos
             return np.c_[neg, pos]
         else:
+            Xs = []
             ncl = self.num_classes
             index = np.arange(0, X.shape[1] + ncl, ncl)
             for strt, stp, flag in zip(index, index[1:], self.apply_norm):

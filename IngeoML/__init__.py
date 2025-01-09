@@ -23,4 +23,4 @@ try:
 except ImportError:
     logger.warning('Install jax and optax to use IngeoML.optimizer')
 
-__version__ = '0.0.27'
+__version__ = '0.0.28'

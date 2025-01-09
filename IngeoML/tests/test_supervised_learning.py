@@ -70,3 +70,4 @@ def test_ConvexClassifier_kcl():
     # assert stack.final_estimator_ is None
     assert stack.final_estimator_.classes.shape[0] == 3
     assert stack.final_estimator_.mixer.shape[0] == 5
+    stack.predict(X)
