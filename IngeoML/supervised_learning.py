@@ -67,6 +67,9 @@ class ConvexClassifier(ClassifierMixin, BaseEstimator):
 
     @mixer.setter
     def mixer(self, value):
+        if np.any(value < 0):
+            value[value < 0] = 0
+            value = value / value.sum()
         self._mixer = value
 
     @property
@@ -103,9 +106,12 @@ class ConvexClassifier(ClassifierMixin, BaseEstimator):
         neg = 1 - pos
         hy_prob = cp.vstack([neg, pos]).T
         obj = cp.Minimize(cp.sum(cp.rel_entr(y_prob, hy_prob), axis=1) @ weights)
-        constraints = [coef @ one == 1, coef >= 0, coef <= 1]
+        constraints = [one @ coef == 1, coef >= 0]
         prob = cp.Problem(obj, constraints)
-        prob.solve()
+        try:
+            prob.solve()
+        except cp.SolverError:
+            prob.solve(solver='SCS', time_limit_secs=1800)
         self.mixer = coef.value
 
     def normalize_kcl(self, X):
@@ -137,9 +143,12 @@ class ConvexClassifier(ClassifierMixin, BaseEstimator):
             pos += C * w
 
         obj = cp.Minimize(cp.sum(cp.rel_entr(y_prob, pos), axis=1) @ weights)
-        constraints = [coef @ one == 1, coef >= 0, coef <= 1]
+        constraints = [one @ coef == 1, coef >= 0]
         prob = cp.Problem(obj, constraints)
-        prob.solve()
+        try:
+            prob.solve()
+        except cp.SolverError:
+            prob.solve(solver='SCS', time_limit_secs=1800)
         self.mixer = coef.value
 
     def fit(self, X: np.ndarray, y: np.ndarray):

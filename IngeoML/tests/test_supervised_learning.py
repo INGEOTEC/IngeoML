@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import numpy as np
 from sklearn.datasets import load_breast_cancer, load_iris
 from sklearn.svm import LinearSVC
 from sklearn.linear_model import LogisticRegression
@@ -71,3 +72,10 @@ def test_ConvexClassifier_kcl():
     assert stack.final_estimator_.classes.shape[0] == 3
     assert stack.final_estimator_.mixer.shape[0] == 5
     stack.predict(X)
+
+
+def test_ConvexClassifier_mixer():
+    """Test negative values in convex combination"""
+    convex = ConvexClassifier()
+    convex.mixer = np.array([-0.01, 0.8, 0.2])
+    assert np.all(convex.mixer == np.array([0, 0.8, 0.2]))
