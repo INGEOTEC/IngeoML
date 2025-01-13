@@ -62,7 +62,7 @@ class ConvexClassifier(ClassifierMixin, BaseEstimator):
 
     @property
     def mixer(self):
-        """Mix value"""
+        """Convex combination"""
         return self._mixer
 
     @mixer.setter
@@ -152,6 +152,7 @@ class ConvexClassifier(ClassifierMixin, BaseEstimator):
         self.mixer = coef.value
 
     def fit(self, X: np.ndarray, y: np.ndarray):
+        """Estimate the parameters given the dataset (`X` and `y`)"""
         self.classes, _ = np.unique(y, return_counts=True)
         elements =  1 / (_ * self.classes.shape[0])
         weights = np.empty(y.shape[0])
