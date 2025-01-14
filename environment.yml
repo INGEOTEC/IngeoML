@@ -4,7 +4,8 @@ channels:
 dependencies:
   - python
   - scikit-learn
+  - cvxpy
   - pip
+  - pip:
     - jax
     - optax
-    - cvxpy
