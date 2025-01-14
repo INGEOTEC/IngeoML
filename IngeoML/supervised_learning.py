@@ -21,6 +21,20 @@ import cvxpy as cp
 class ConvexClassifier(ClassifierMixin, BaseEstimator):
     """Convex Classifier
     
+    >>> from sklearn.datasets import load_iris
+    >>> from sklearn.svm import LinearSVC
+    >>> from sklearn.ensemble import RandomForestClassifier
+    >>> from sklearn.ensemble import StackingClassifier
+    >>> from IngeoML import ConvexClassifier
+    >>> X, y = load_iris(return_X_y=True)
+    >>> svc = LinearSVC()
+    >>> forest = RandomForestClassifier()
+    >>> convex = ConvexClassifier()
+    >>> stack = StackingClassifier([('SVC', svc),
+                                     ('Forest', forest)],
+                                    final_estimator=convex).fit(X, y)
+    >>> stack.final_estimator_.mixer
+    array([0.01783184, 0.98216816])
     """
 
     @property
@@ -48,11 +62,14 @@ class ConvexClassifier(ClassifierMixin, BaseEstimator):
 
     @property
     def mixer(self):
-        """Mix value"""
+        """Convex combination"""
         return self._mixer
 
     @mixer.setter
     def mixer(self, value):
+        if np.any(value < 0):
+            value[value < 0] = 0
+            value = value / value.sum()
         self._mixer = value
 
     @property
@@ -89,9 +106,12 @@ class ConvexClassifier(ClassifierMixin, BaseEstimator):
         neg = 1 - pos
         hy_prob = cp.vstack([neg, pos]).T
         obj = cp.Minimize(cp.sum(cp.rel_entr(y_prob, hy_prob), axis=1) @ weights)
-        constraints = [coef @ one == 1, coef >= 0, coef <= 1]
+        constraints = [one @ coef == 1, coef >= 0]
         prob = cp.Problem(obj, constraints)
-        prob.solve()
+        try:
+            prob.solve()
+        except cp.SolverError:
+            prob.solve(solver='SCS', time_limit_secs=1800)
         self.mixer = coef.value
 
     def normalize_kcl(self, X):
@@ -123,12 +143,16 @@ class ConvexClassifier(ClassifierMixin, BaseEstimator):
             pos += C * w
 
         obj = cp.Minimize(cp.sum(cp.rel_entr(y_prob, pos), axis=1) @ weights)
-        constraints = [coef @ one == 1, coef >= 0, coef <= 1]
+        constraints = [one @ coef == 1, coef >= 0]
         prob = cp.Problem(obj, constraints)
-        prob.solve()
+        try:
+            prob.solve()
+        except cp.SolverError:
+            prob.solve(solver='SCS', time_limit_secs=1800)
         self.mixer = coef.value
 
     def fit(self, X: np.ndarray, y: np.ndarray):
+        """Estimate the parameters given the dataset (`X` and `y`)"""
         self.classes, _ = np.unique(y, return_counts=True)
         elements =  1 / (_ * self.classes.shape[0])
         weights = np.empty(y.shape[0])
@@ -155,6 +179,7 @@ class ConvexClassifier(ClassifierMixin, BaseEstimator):
             neg = 1 - pos
             return np.c_[neg, pos]
         else:
+            Xs = []
             ncl = self.num_classes
             index = np.arange(0, X.shape[1] + ncl, ncl)
             for strt, stp, flag in zip(index, index[1:], self.apply_norm):
