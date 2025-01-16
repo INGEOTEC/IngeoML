@@ -19,7 +19,7 @@ import cvxpy as cp
 
 
 class ConvexClassifier(ClassifierMixin, BaseEstimator):
-    """Convex Classifier
+    """`ConvexClassifier` combines the probabilities predicted by base classifiers in a convex manner. It is designed to work alongside with `StackingClassifier`.
     
     >>> from sklearn.datasets import load_iris
     >>> from sklearn.svm import LinearSVC
