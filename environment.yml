@@ -5,6 +5,7 @@ dependencies:
   - python
   - scikit-learn
   - cvxpy
+  - sphinx
   - pip
   - pip:
     - jax
