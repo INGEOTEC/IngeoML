@@ -12,10 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from IngeoML.feature_selection import SelectFromModelCV
-from sklearn.metrics import f1_score
-from sklearn.datasets import load_wine
 from sklearn.svm import LinearSVC
+from sklearn.pipeline import make_pipeline
+from sklearn.metrics import f1_score
+from sklearn.datasets import load_wine, load_digits
+from IngeoML.feature_selection import SelectFromModelCV
+from IngeoML.feature_selection import SelectFromLinearSVC
 
 
 def test_SelectFromModelCV():
@@ -40,4 +42,15 @@ def test_SelectFromModelCV_prefit():
     ss = sorted([(k, v) for k, v in select.cv_results_.items()], key=lambda x: x[1])
     sum_support = (select.get_support()).sum()
     assert ss[-1][0] == sum_support
-    assert select.transform(X).shape[1] == sum_support    
+    assert select.transform(X).shape[1] == sum_support
+
+
+def test_SelectFromLinearSVC():
+    select = SelectFromLinearSVC()
+    cl = LinearSVC(class_weight='balanced')
+    X, y = load_digits(return_X_y=True)
+    pipe = make_pipeline(select, cl).fit(X, y)
+    hy = pipe.predict(X)
+    assert hy.shape[0] == X.shape[0]
+    assert pipe.steps[0][1].features.sum() < X.shape[1]
+    
