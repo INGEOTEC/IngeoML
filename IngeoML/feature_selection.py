@@ -165,7 +165,7 @@ class SelectFromLinearSVC(TransformerMixin, BaseEstimator):
     >>> from sklearn.pipeline import make_pipeline
     >>> from sklearn.svm import LinearSVC
     >>> from sklearn.datasets import load_digits
-    >>> from IngeoML.feature_selection import SelectFromLinearSVC
+    >>> from IngeoML import SelectFromLinearSVC
     >>> select = SelectFromLinearSVC()
     >>> cl = LinearSVC(class_weight='balanced')
     >>> X, y = load_digits(return_X_y=True)
