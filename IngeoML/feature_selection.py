@@ -184,7 +184,7 @@ class SelectFromLinearSVC(TransformerMixin, BaseEstimator):
             inner = np.zeros(X.shape[1], dtype=bool)
             inner[np.arange(X.shape[1])[mask][_]] = True
             mask[inner] = False
-        self.features = mask
+        self.features = ~mask
         return self
     
     @property
@@ -198,4 +198,4 @@ class SelectFromLinearSVC(TransformerMixin, BaseEstimator):
 
     def transform(self, X):
         """Select features"""
-        return X[:, self._features]
+        return X[:, self.features]
