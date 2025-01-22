@@ -19,5 +19,8 @@ Feature Selection
 :py:class:`IngeoML.feature_selection` API
 --------------------------------------------
 
+.. autoclass:: IngeoML.feature_selection.SelectFromLinearSVC
+	:members: fit, transform, features
+
 .. autoclass:: IngeoML.feature_selection.SelectFromModelCV
    :members: fit, max_iter, cv, scoring, min_features_to_select

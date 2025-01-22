@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from IngeoML.feature_selection import SelectFromModelCV
+from IngeoML.feature_selection import SelectFromModelCV, SelectFromLinearSVC
 from IngeoML.analysis import feature_importance
 from IngeoML.analysis import predict_shuffle_inputs, kfold_predict_shuffle_inputs
 from IngeoML.supervised_learning import ConvexClassifier
@@ -23,4 +23,4 @@ try:
 except ImportError:
     logger.warning('Install jax and optax to use IngeoML.optimizer')
 
-__version__ = '0.0.28'
+__version__ = '0.0.29'

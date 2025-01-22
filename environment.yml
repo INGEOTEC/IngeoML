@@ -3,7 +3,11 @@ channels:
   - conda-forge
 dependencies:
   - python
-  - pip
   - scikit-learn
-  - jax
-  - optax
+  - cvxpy
+  - sphinx
+  - pytest
+  - pip
+  - pip:
+    - jax
+    - optax

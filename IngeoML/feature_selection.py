@@ -11,14 +11,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from dataclasses import dataclass
 from typing import Any, Callable, Union
 from numbers import Integral
+import numpy as np
+from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.svm import LinearSVC
 from sklearn.feature_selection import SelectFromModel
 from sklearn.utils._param_validation import Interval
 from sklearn.base import is_classifier, clone
 from sklearn.model_selection import check_cv
 from sklearn.metrics import check_scoring
-import numpy as np
+
 
 
 class SelectFromModelCV(SelectFromModel):
@@ -152,3 +156,47 @@ class SelectFromModelCV(SelectFromModel):
     # def n_jobs(self, value):
     #     self._n_jobs = value        
         
+
+
+@dataclass
+class SelectFromLinearSVC(TransformerMixin, BaseEstimator):
+    """SelectFromLinearSVC selects features using :py:class:`~sklearn.svm.LinearSVC` with penalty 'l1'.
+
+    >>> from sklearn.pipeline import make_pipeline
+    >>> from sklearn.svm import LinearSVC
+    >>> from sklearn.datasets import load_digits
+    >>> from IngeoML import SelectFromLinearSVC
+    >>> select = SelectFromLinearSVC()
+    >>> cl = LinearSVC(class_weight='balanced')
+    >>> X, y = load_digits(return_X_y=True)
+    >>> pipe = make_pipeline(select, cl).fit(X, y)
+    >>> pipe.steps[0][1].features
+    """
+    iterations: int=2
+
+    def fit(self, X, y):
+        """Estimate the parameters"""
+        mask = np.ones(X.shape[1], dtype=bool)
+        for _ in range(self.iterations):
+            m = LinearSVC(class_weight='balanced',
+                          dual=False,
+                          penalty='l1', C=1).fit(X[:, mask], y)
+            _ = m.coef_[0] != 0
+            inner = np.zeros(X.shape[1], dtype=bool)
+            inner[np.arange(X.shape[1])[mask][_]] = True
+            mask[inner] = False
+        self.features = ~mask
+        return self
+    
+    @property
+    def features(self):
+        """Features selected"""
+        return self._features
+    
+    @features.setter
+    def features(self, value):
+        self._features = value
+
+    def transform(self, X):
+        """Select features"""
+        return X[:, self.features]
