@@ -179,6 +179,7 @@ class SelectFromLinearSVC(TransformerMixin, BaseEstimator):
         mask = np.ones(X.shape[1], dtype=bool)
         for _ in range(self.iterations):
             m = LinearSVC(class_weight='balanced',
+                          dual='auto',
                           penalty='l1', C=1).fit(X[:, mask], y)
             _ = m.coef_[0] != 0
             inner = np.zeros(X.shape[1], dtype=bool)
